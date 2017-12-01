@@ -1,0 +1,2 @@
+## -*- mode: Makefile; -*-
+PKG_LIBS = $(FLIBS)
