@@ -18,7 +18,7 @@ using Eigen::VectorXd;
 //
 
 // [[Rcpp::export]]
-VectorXd dirichilet_rng(VectorXd alpha) {
+Eigen::VectorXd dirichilet_rng(Eigen::VectorXd alpha) {
   int len;
   len=alpha.size();
   VectorXd result(len);
@@ -61,6 +61,26 @@ double component_probs(double b,Eigen::VectorXd pi,double sigmaG){
     else
       return  0.01;
   }
+}
+
+double categorical(Eigen::VectorXd probs){
+  double p;
+
+  p=R::runif(0,1);
+  if(p<= probs[0]+probs[1]){
+    if(p<=probs[0])
+      return 0;
+    else
+      return 0.0001;
+
+  }
+  else{
+    if(p<=probs[2])
+      return 0.001;
+    else
+      return 0.01;
+  }
+
 }
 // You can include R code blocks in C++ files processed with sourceCpp
 // (useful for testing and development). The R code will be automatically

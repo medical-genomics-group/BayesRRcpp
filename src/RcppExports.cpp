@@ -6,6 +6,84 @@
 
 using namespace Rcpp;
 
+// BayesRSampler
+Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double v0, double s02);
+RcppExport SEXP _BayesRRcpp_BayesRSampler(SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP v0SEXP, SEXP s02SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
+    Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
+    Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< double >::type v0(v0SEXP);
+    Rcpp::traits::input_parameter< double >::type s02(s02SEXP);
+    rcpp_result_gen = Rcpp::wrap(BayesRSampler(seed, max_iterations, burn_in, thinning, X, Y, v0, s02));
+    return rcpp_result_gen;
+END_RCPP
+}
+// dirichilet_rng
+Eigen::VectorXd dirichilet_rng(Eigen::VectorXd alpha);
+RcppExport SEXP _BayesRRcpp_dirichilet_rng(SEXP alphaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type alpha(alphaSEXP);
+    rcpp_result_gen = Rcpp::wrap(dirichilet_rng(alpha));
+    return rcpp_result_gen;
+END_RCPP
+}
+// inv_gamma_rng
+double inv_gamma_rng(double shape, double scale);
+RcppExport SEXP _BayesRRcpp_inv_gamma_rng(SEXP shapeSEXP, SEXP scaleSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type shape(shapeSEXP);
+    Rcpp::traits::input_parameter< double >::type scale(scaleSEXP);
+    rcpp_result_gen = Rcpp::wrap(inv_gamma_rng(shape, scale));
+    return rcpp_result_gen;
+END_RCPP
+}
+// inv_scaled_chisq_rng
+double inv_scaled_chisq_rng(double dof, double scale);
+RcppExport SEXP _BayesRRcpp_inv_scaled_chisq_rng(SEXP dofSEXP, SEXP scaleSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type dof(dofSEXP);
+    Rcpp::traits::input_parameter< double >::type scale(scaleSEXP);
+    rcpp_result_gen = Rcpp::wrap(inv_scaled_chisq_rng(dof, scale));
+    return rcpp_result_gen;
+END_RCPP
+}
+// norm_rng
+double norm_rng(double mean, double sigma2);
+RcppExport SEXP _BayesRRcpp_norm_rng(SEXP meanSEXP, SEXP sigma2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type mean(meanSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
+    rcpp_result_gen = Rcpp::wrap(norm_rng(mean, sigma2));
+    return rcpp_result_gen;
+END_RCPP
+}
+// component_probs
+double component_probs(double b, Eigen::VectorXd pi, double sigmaG);
+RcppExport SEXP _BayesRRcpp_component_probs(SEXP bSEXP, SEXP piSEXP, SEXP sigmaGSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< double >::type b(bSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type pi(piSEXP);
+    Rcpp::traits::input_parameter< double >::type sigmaG(sigmaGSEXP);
+    rcpp_result_gen = Rcpp::wrap(component_probs(b, pi, sigmaG));
+    return rcpp_result_gen;
+END_RCPP
+}
 // sumDiagonal
 Eigen::MatrixXd sumDiagonal(Eigen::MatrixXd Ma, Eigen::VectorXd va);
 RcppExport SEXP _BayesRRcpp_sumDiagonal(SEXP MaSEXP, SEXP vaSEXP) {
@@ -59,25 +137,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// RandomG
-double RandomG(double shape, double scale);
-RcppExport SEXP _BayesRRcpp_RandomG(SEXP shapeSEXP, SEXP scaleSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type shape(shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type scale(scaleSEXP);
-    rcpp_result_gen = Rcpp::wrap(RandomG(shape, scale));
-    return rcpp_result_gen;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_BayesRRcpp_BayesRSampler", (DL_FUNC) &_BayesRRcpp_BayesRSampler, 8},
+    {"_BayesRRcpp_dirichilet_rng", (DL_FUNC) &_BayesRRcpp_dirichilet_rng, 1},
+    {"_BayesRRcpp_inv_gamma_rng", (DL_FUNC) &_BayesRRcpp_inv_gamma_rng, 2},
+    {"_BayesRRcpp_inv_scaled_chisq_rng", (DL_FUNC) &_BayesRRcpp_inv_scaled_chisq_rng, 2},
+    {"_BayesRRcpp_norm_rng", (DL_FUNC) &_BayesRRcpp_norm_rng, 2},
+    {"_BayesRRcpp_component_probs", (DL_FUNC) &_BayesRRcpp_component_probs, 3},
     {"_BayesRRcpp_sumDiagonal", (DL_FUNC) &_BayesRRcpp_sumDiagonal, 2},
     {"_BayesRRcpp_mvn_rng", (DL_FUNC) &_BayesRRcpp_mvn_rng, 3},
     {"_BayesRRcpp_mvnCoef_rng", (DL_FUNC) &_BayesRRcpp_mvnCoef_rng, 4},
     {"_BayesRRcpp_mvnCoef_rngAug", (DL_FUNC) &_BayesRRcpp_mvnCoef_rngAug, 4},
-    {"_BayesRRcpp_RandomG", (DL_FUNC) &_BayesRRcpp_RandomG, 2},
     {NULL, NULL, 0}
 };
 

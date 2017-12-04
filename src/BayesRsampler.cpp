@@ -30,10 +30,18 @@ struct categorical_functor
   Scalar  m_b;
   Eigen::VectorXd m_c;
 };
+template<typename Scalar>
+struct categorical_init
+{
+  categorical_init(const Eigen::VectorXd& pi) : m_c(pi){}
+
+  const Scalar operator()(const Scalar& x) const{ return categorical(m_c); }
+  Eigen::VectorXd m_c;
+};
 
 
 // [[Rcpp::export]]
-Eigen::MatrixXd BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,MatrixXd X, VectorXd Y,double v0,double s02) {
+Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02) {
   int N;
   int M;
   double mu;
@@ -53,11 +61,24 @@ Eigen::MatrixXd BayesRSampler(int seed, int max_iterations, int burn_in,int thin
   VectorXd residues;
   VectorXd components(X.cols());
   MatrixXd beta(X.cols(),1);
-  MatrixXd result(X.cols(),max_iterations);
+  MatrixXd betaL(X.cols(),max_iterations);
+  MatrixXd componentsL(X.cols(),max_iterations);
+  MatrixXd sigmaGL(1,max_iterations);
+  MatrixXd sigmaEL(1,max_iterations);
+  MatrixXd muL(1,max_iterations);
+  MatrixXd piL(4,max_iterations);
+  MatrixXd xtX(X.cols(),X.cols());
+  MatrixXd xtY(X.cols(),1);
+
+
+
   VectorXd v(4);
   M=X.cols();
   N=Y.rows();
+  xtX=X.transpose()*X;
+  xtY=X.transpose()*Y;
   priorPi.setOnes();
+  priorPi*=0.25;
   cVa[0] = 0;
   cVa[1] = 0.0001;
   cVa[2] = 0.001;
@@ -70,15 +91,15 @@ Eigen::MatrixXd BayesRSampler(int seed, int max_iterations, int burn_in,int thin
   sigmaE=abs(norm_rng(0,1));
   sigmaG=abs(norm_rng(0,1));
   pi=dirichilet_rng(priorPi);
-  components.setOnes();
+  components.unaryExpr(categorical_init<double>(priorPi));
   residues=Y-X*beta;
 
   for(int iteration=0; iteration < max_iterations; iteration++){
     std::cout << "iteration: "<<iteration <<"\n";
     mu = norm_rng((1/(double)N)*residues.sum(), sigmaE/(double)N);
     components= beta.unaryExpr(categorical_functor<double>(pi,sigmaG));
-    beta= mvnCoef_rngAug(1,Y,X,sigmaG*components);
-    residues=Y-X*beta.sparseView();
+    beta= mvnCoef_rng(1,xtY,xtX,sigmaG*components);
+    residues=Y-X*beta;
     m0=(components.array()>1e-10).count();
     sigmaG=inv_scaled_chisq_rng(v0+m0,(beta.array().pow(2).sum()+v0*s02)/(v0+m0));
     sigmaE=inv_scaled_chisq_rng(v0+N,(((residues.array()-mu).array().pow(2)).sum()+v0*s02)/(v0+N));
@@ -87,9 +108,19 @@ Eigen::MatrixXd BayesRSampler(int seed, int max_iterations, int burn_in,int thin
     v(2)=priorPi[2]+(components.array()==cVa[2]).count();
     v(3)=priorPi[3]+(components.array()==cVa[3]).count();
     pi=dirichilet_rng(v);
-    result.col(iteration)=beta;
+    betaL.col(iteration)=beta;
+    sigmaGL(1,iteration)=sigmaG;
+    sigmaEL(1,iteration)=sigmaE;
+    muL(1,iteration)=mu;
+    piL.col(iteration)=pi;
+    componentsL.col(iteration)=components;
   }
-    return result;
+    return Rcpp::List::create(Rcpp::Named("beta")=betaL.transpose(),
+                              Rcpp::Named("sigmaG")=sigmaGL.transpose(),
+                              Rcpp::Named("sigmaE")=sigmaEL.transpose(),
+                              Rcpp::Named("pi")=piL.transpose(),
+                              Rcpp::Named("componets")=componentsL.transpose(),
+                              Rcpp::Named("mu")=muL.transpose());
 }
 
 
@@ -101,16 +132,15 @@ Eigen::MatrixXd BayesRSampler(int seed, int max_iterations, int burn_in,int thin
 /*** R
 M=100
 N=1000
-B=matrix(rnorm(M),ncol=1)
-B[100,1]=0
+B=matrix(rnorm(M,sd=0.1),ncol=1)
+B[sample(1:100,30),1]=0
   X <- matrix(rnorm(M*N), N, M)
-  Y=X%*%B+rnorm(N,sd=0.01)
+  Y=X%*%B+rnorm(N,sd=0.1)
   Y=scale(Y)
   X=scale(X)
 
-tmp<-BayesRSampler(3000, 100, 1,1,X, Y,1,1)
-tmp
-
+tmp<-BayesRSampler(3000, 11000, 1,1,X, Y,0.01,0.01)
+plot(B,rowMeans(tmp$beta))
 
   */
 
