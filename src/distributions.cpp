@@ -82,16 +82,33 @@ double categorical(Eigen::VectorXd probs){
   }
 
 }
+
+double beta_rng(double a,double b){
+  return R::rbeta(a,b);
+}
+// [[Rcpp::export]]
+double spike_slab_rng(double w,double lambda,double sigmaS){
+   double p;
+   double sum;
+   double lk1;
+   double lk0;
+   double prob;
+   p=R::runif(0,1);
+   lk1= log(w)-0.5*lambda*lambda/sigmaS;
+   lk0= (lambda<=1e-10?1:0)*log(1-w);
+   prob=1/(exp(lk1-lk0));
+}
 // You can include R code blocks in C++ files processed with sourceCpp
 // (useful for testing and development). The R code will be automatically
 // run after the compilation.
 //
 
 /*** R
-tmp<-dirichilet_rng(c(1.0,2.0,3.0,4.0))
-tmp
-inv_gamma_rng(0.05,0.05)
-inv_scaled_chisq_rng(1,0.1)
-norm_rng(0,1)
-component_probs(0.01,c(0.25,0.25,0.25,0.25),1)
+#tmp<-dirichilet_rng(c(1.0,2.0,3.0,4.0))
+#tmp
+#inv_gamma_rng(0.05,0.05)
+#inv_scaled_chisq_rng(1,0.1)
+#norm_rng(0,1)
+#component_probs(0.01,c(0.25,0.25,0.25,0.25),1)
+spike_slab_rng(0.5,0,0.02)
 */
