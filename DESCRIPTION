@@ -1,12 +1,12 @@
 Package: BayesRRcpp
 Type: Package
-Title: What the Package Does (Title Case)
+Title: C++ implementation of Bayes R
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
+Author: Daniel Trejo Banos, Matthew Robinson
+Maintainer: The package maintainer <daniel.trejobanos@unil.ch>
 Description: More about what it does (maybe more than one line)
     Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+License: 
 Encoding: UTF-8
 LazyData: true
 LinkingTo: Rcpp,RcppEigen
