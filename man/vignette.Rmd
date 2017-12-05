@@ -1,0 +1,90 @@
+---
+title: "small manual"
+author: "Daniel Trejo Banos"
+date: "05/12/2017"
+output: html_document
+---
+
+## Current Bayes R implementation
+
+The current package prototype is an implementation of Bayes R (citation ). It was developed in C++ 11.0 with interface to R through Rcpp. For numeric and matrix computations the library Eigen was used, along with it's R interface. The implementation has the following caveats:
+
+- the random effects coefficients are sampled from four distributions in a mixture. the mixture variances are 0, 0.01, 0.001 and 0.0001 times the parameter $\sigma_{G}$. for now, the mixture components are hardcoded as 0, 0.01, 0.001 and 0.0001, but that can be changed as an additional parameter in the near future.
+- the random effects are sampled all at once, by performing the cholesky decomposition of the matrix $X'X+D$ where D is the diagonal matrix containing the mixture variances. Said decomposition has a $\mathcal{O}\left( M^3\right)$ complexity (where M is the number of effects). There are many ways to reduce said complexity, like conditioning in subsets of effects or augmented variable sampling(none which has been implemented yet).
+- Even though the function contains parameters for burnin time and thinning, the functionality hasnt been implemented yet, so you will be returned the total numner of samples given by the argument max_iterations. 
+- It is contemplated to have a parallel process storing the samples in a file while the sampler does his thing, this functionality will be implemented very soon, but meanwhile, keep in mind that ALL the samples will be sotred into memory.
+
+Having said that, proceed as following after having cloned the repository, go to the project folder and run:
+
+ R CMD INSTALL --no-multiarch --with-keep.source BayesRRcpp
+
+alternatively from Rstudio open the file BayesRRcpp.Rproj
+
+then in the upper right pannel, on the tab "build" press the button "build and reload"
+
+It may be necessary to install the packages Rcpp and RcppEigen.
+
+if build was succesful, we will be to use the command
+
+```{r}
+library(BayesRRcpp)
+
+```
+
+
+
+Then for the standard BayesR model we have the function
+
+BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02)
+
+where 
+
+seed= random seed; not functional for now
+
+max_iterations= number of samples
+
+burn_in= burn in samples; not implemented yet
+
+thinning= thinning regime; not implemented yet
+
+X= matrix of markers (columns) and individuals(rows)
+
+Y= matrix of phenotypes (columns) and individuals(rows); if Y has more than one column, use the function BayesRSamplerM instead (which is slower).
+
+v0= prior degrees of freedom of the scaled inverse chi square distribution, set to a weakly informative value of 0.01
+
+s02= prior scale for the scaled inverse chi square distribution, set to a weakly informative value of 0.01
+
+```{r,message=F,warning=F}
+library(BayesRRcpp)
+M=100
+N=1000
+B=matrix(rnorm(M,sd=0.1),ncol=1)
+B[sample(1:100,30),1]=0#we randomly set 30 effects to zero
+  X <- matrix(rnorm(M*N), N, M)
+  Y=X%*%B+rnorm(N,sd=0.1)
+  Y=scale(Y)
+  X=scale(X)
+
+tmp<-BayesRSampler(1, 11000, 1,1,X, Y,0.01,0.01)
+plot(B,colMeans(tmp$beta[10000:11000,]))
+lines(B,B)
+```
+
+the sampler outputs a list whose members are
+
+beta= random effects
+
+sigmaG= genetic effects variance
+
+components= at which mixture each beta effects belongs
+
+sigmaE = residuals variance
+
+pi= mixing proportions
+
+mu= random intercept parameter
+
+all variables are represented by columns, similarly to stan output.
+
+
