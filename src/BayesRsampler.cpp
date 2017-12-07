@@ -84,6 +84,7 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   MatrixXd xtX(M,M);
   MatrixXd xtY(M,1);
   MatrixXd xS(M,1);
+  MatrixXd sum_beta_sqr(1,max_iterations);
   Map<MatrixXd> xM(X.data(),N,M);
   VectorXd v(4);
   M=X.cols();
@@ -129,13 +130,15 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
     muL(1,iteration)=mu;
     piL.col(iteration)=pi;
     componentsL.col(iteration)=components;
+    sum_beta_sqr(iteration)= (beta.sparseView().cwiseProduct(beta).cwiseProduct(components.cwiseInverse())).sum();
   }
     return Rcpp::List::create(Rcpp::Named("beta")=betaL.transpose(),
                               Rcpp::Named("sigmaG")=sigmaGL.transpose(),
                               Rcpp::Named("sigmaE")=sigmaEL.transpose(),
                               Rcpp::Named("pi")=piL.transpose(),
                               Rcpp::Named("components")=componentsL.transpose(),
-                              Rcpp::Named("mu")=muL.transpose());
+                              Rcpp::Named("mu")=muL.transpose(),
+                              Rcpp::Named("sum_beta_sqr")=sum_beta_sqr.transpose());
 }
 
 
@@ -148,7 +151,7 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
 M=100
 N=10000
 B=matrix(rnorm(M,sd=0.1),ncol=1)
-#B[sample(1:100,30),1]=0
+B[sample(1:100,30),1]=0
   X <- matrix(rnorm(M*N), N, M)
   Y=X%*%B+rnorm(N,sd=0.01)
   Y=scale(Y)
