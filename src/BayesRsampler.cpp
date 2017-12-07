@@ -4,6 +4,7 @@
 #include <random>
 #include "distributions.h"
 #include "MultVar.h"
+
 // [[Rcpp::depends(RcppEigen)]]
 using namespace Rcpp;
 using namespace RcppEigen;
@@ -12,6 +13,19 @@ using Eigen::Matrix;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using Eigen::SparseVector;
+using Eigen::LLT;
+using Eigen::Lower;
+using Eigen::Map;
+using Eigen::Upper;
+typedef Map<MatrixXd> MapMatd;
+
+inline MatrixXd AtA(const MapMatd& A) {
+  int n(A.cols());
+  return MatrixXd(n,n).setZero().selfadjointView<Lower>()
+                      .rankUpdate(A.adjoint());
+}
+
+
 // This is a simple example of exporting a C++ function to R. You can
 // source this function into an R session using the Rcpp::sourceCpp
 // function (or via the Source button on the editor toolbar). Learn
@@ -69,13 +83,11 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   MatrixXd piL(4,max_iterations);
   MatrixXd xtX(M,M);
   MatrixXd xtY(M,1);
-
-
-
+  Map<MatrixXd> xM(X.data(),N,M);
   VectorXd v(4);
   M=X.cols();
   N=Y.rows();
-  xtX=X.transpose()*X;
+  xtX=AtA(xM);
   xtY=X.transpose()*Y;
   priorPi.setOnes();
   priorPi*=0.25;
