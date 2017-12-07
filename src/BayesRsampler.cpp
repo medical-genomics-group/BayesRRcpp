@@ -42,8 +42,8 @@ struct categorical_init
 
 // [[Rcpp::export]]
 Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02) {
-  int N;
-  int M;
+  int N(Y.size());
+  int M(X.cols());
   double mu;
   double sigmaG;
   double sigmaE;
@@ -59,16 +59,16 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   VectorXd cVa(4);
   VectorXd invsqrtcVa(4);
   VectorXd residues;
-  VectorXd components(X.cols());
-  MatrixXd beta(X.cols(),1);
-  MatrixXd betaL(X.cols(),max_iterations);
-  MatrixXd componentsL(X.cols(),max_iterations);
+  VectorXd components(M);
+  MatrixXd beta(M,1);
+  MatrixXd betaL(M,max_iterations);
+  MatrixXd componentsL(M,max_iterations);
   MatrixXd sigmaGL(1,max_iterations);
   MatrixXd sigmaEL(1,max_iterations);
   MatrixXd muL(1,max_iterations);
   MatrixXd piL(4,max_iterations);
-  MatrixXd xtX(X.cols(),X.cols());
-  MatrixXd xtY(X.cols(),1);
+  MatrixXd xtX(M,M);
+  MatrixXd xtY(M,1);
 
 
 
@@ -140,7 +140,7 @@ B[sample(1:100,30),1]=0
   X=scale(X)
 
 tmp<-BayesRSampler(3000, 11000, 1,1,X, Y,0.01,0.01)
-plot(B,rowMeans(tmp$beta))
+plot(B,colMeans(tmp$beta))
 
   */
 
