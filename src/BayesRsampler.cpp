@@ -83,12 +83,14 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   MatrixXd piL(4,max_iterations);
   MatrixXd xtX(M,M);
   MatrixXd xtY(M,1);
+  MatrixXd xS(M,1);
   Map<MatrixXd> xM(X.data(),N,M);
   VectorXd v(4);
   M=X.cols();
   N=Y.rows();
   xtX=AtA(xM);
   xtY=X.transpose()*Y;
+  xS=X.transpose().rowwise().sum();
   priorPi.setOnes();
   priorPi*=0.25;
   cVa[0] = 0;
@@ -110,10 +112,11 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
     std::cout << "iteration: "<<iteration <<"\n";
     mu = norm_rng((1/(double)N)*residues.sum(), sigmaE/(double)N);
     components= beta.unaryExpr(categorical_functor<double>(pi,sigmaG));
-    beta= mvnCoef_rng(1,xtY,xtX,sigmaG*components);
+    beta= mvnCoef_rng(1,(xtY- mu*xS),xtX,sigmaG*components);
+    beta = (components.array() > 1e-10 ).select(beta, MatrixXd::Zero(beta.rows(), beta.cols()));
     residues=Y-X*beta;
     m0=(components.array()>1e-10).count();
-    sigmaG=inv_scaled_chisq_rng(v0+m0,(beta.array().pow(2).sum()+v0*s02)/(v0+m0));
+    sigmaG=inv_scaled_chisq_rng(v0+m0,((beta.array()).pow(2).sum()+v0*s02)/(v0+m0));
     sigmaE=inv_scaled_chisq_rng(v0+N,(((residues.array()-mu).array().pow(2)).sum()+v0*s02)/(v0+N));
     v(0)=priorPi[0]+(components.array()==cVa[0]).count();
     v(1)=priorPi[1]+(components.array()==cVa[1]).count();
@@ -131,7 +134,7 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
                               Rcpp::Named("sigmaG")=sigmaGL.transpose(),
                               Rcpp::Named("sigmaE")=sigmaEL.transpose(),
                               Rcpp::Named("pi")=piL.transpose(),
-                              Rcpp::Named("componets")=componentsL.transpose(),
+                              Rcpp::Named("components")=componentsL.transpose(),
                               Rcpp::Named("mu")=muL.transpose());
 }
 
@@ -143,16 +146,17 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
 
 /*** R
 M=100
-N=1000
+N=10000
 B=matrix(rnorm(M,sd=0.1),ncol=1)
-B[sample(1:100,30),1]=0
+#B[sample(1:100,30),1]=0
   X <- matrix(rnorm(M*N), N, M)
-  Y=X%*%B+rnorm(N,sd=0.1)
+  Y=X%*%B+rnorm(N,sd=0.01)
   Y=scale(Y)
   X=scale(X)
 
 tmp<-BayesRSampler(3000, 11000, 1,1,X, Y,0.01,0.01)
-plot(B,colMeans(tmp$beta))
-
+plot(B,colMeans(tmp$beta[10000:11000,]))
+lines(B,B)
+abline(h=0)
   */
 
