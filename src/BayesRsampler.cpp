@@ -130,7 +130,7 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
     muL(1,iteration)=mu;
     piL.col(iteration)=pi;
     componentsL.col(iteration)=components;
-    sum_beta_sqr(iteration)= (beta.sparseView().cwiseProduct(beta).cwiseProduct(components.cwiseInverse())).sum();
+    sum_beta_sqr(iteration)= ((beta.sparseView().cwiseProduct(beta).cwiseProduct(components.cwiseInverse())).sum()+v0*s02)/(m0+v0);
   }
     return Rcpp::List::create(Rcpp::Named("beta")=betaL.transpose(),
                               Rcpp::Named("sigmaG")=sigmaGL.transpose(),
@@ -150,12 +150,12 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
 /*** R
 M=100
 N=10000
-B=matrix(rnorm(M,sd=0.1),ncol=1)
+B=matrix(rnorm(M,sd=sqrt(0.01)),ncol=1)
 B[sample(1:100,30),1]=0
   X <- matrix(rnorm(M*N), N, M)
-  Y=X%*%B+rnorm(N,sd=0.01)
-  Y=scale(Y)
-  X=scale(X)
+  Y=X%*%B+rnorm(N,sd=0.001)
+ Y=scale(Y)
+ X=scale(X)
 
 tmp<-BayesRSampler(3000, 11000, 1,1,X, Y,0.01,0.01)
 plot(B,colMeans(tmp$beta[10000:11000,]))
