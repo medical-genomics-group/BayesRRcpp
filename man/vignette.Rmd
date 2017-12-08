@@ -87,4 +87,62 @@ mu= random intercept parameter
 
 all variables are represented by columns, similarly to stan output.
 
+## Installation on cluster
+
+to install the package on the cluster:
+
+go to your home directory (~/) and create a directory for the repository, then use git (already installed as part of vital it)
+
+```{bash,eval = F}
+git clone https://github.com/ctggroup/BayesRRcpp.git
+```
+
+now change create a directory in your home directory (if it doesnt exist)
+
+```{bash,eval=F}
+mkdir ~/.R
+```
+
+and create a Makevars file telling R to compile using  C++11 and support for multi threading
+
+```{bash,eval=F}
+echo 'CXXFLAGS += -std=gnu++11 -fopenmp'> ~/.R/Makevars
+```
+
+finally change to the PARENT DIRECTORY in which BayesRRcpp is contained, for example, if BayesRRcpp is in ~/repo/BayesRRcpp change to ~/repo/
+
+there execute
+
+```{bash,eval=F}
+module add R/3.3.2
+```
+
+now you can start your R session
+
+```{bash, eval=F}
+R
+
+```
+
+
+Given that bayes Rcpp requires packages "Rcpp" and "RcppEigen" we are going to install them. We wont be able to install them globally but R will ask you to install them locally in your home directory
+
+```{r}
+install.packages("Rcpp")
+install.packages("RcppEigen")
+
+```
+
+close your R session, and exectue the following command
+
+```{bash}
+R CMD build BayesRRcpp
+R CMD INSTALL --preclean --no-multiarch --with-keep.source BayesRRcpp
+```
+
+and now, assuming the build and installation succeeded you will be able to call BayesRcpp directly as a library
+
+```{r}
+library(BayesRRcpp)
+```
 
