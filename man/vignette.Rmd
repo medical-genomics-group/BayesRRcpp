@@ -127,7 +127,7 @@ R
 
 Given that bayes Rcpp requires packages "Rcpp" and "RcppEigen" we are going to install them. We wont be able to install them globally but R will ask you to install them locally in your home directory
 
-```{r}
+```{r,eval=F}
 install.packages("Rcpp")
 install.packages("RcppEigen")
 
@@ -135,14 +135,14 @@ install.packages("RcppEigen")
 
 close your R session, and exectue the following command
 
-```{bash}
+```{bash,eval=F}
 R CMD build BayesRRcpp
 R CMD INSTALL --preclean --no-multiarch --with-keep.source BayesRRcpp
 ```
 
 and now, assuming the build and installation succeeded you will be able to call BayesRcpp directly as a library
 
-```{r}
+```{r,eval=F}
 library(BayesRRcpp)
 ```
 
