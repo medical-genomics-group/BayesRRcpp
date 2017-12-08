@@ -46,17 +46,17 @@ double component_probs(double b,Eigen::VectorXd pi,double sigmaG){
   double b2;
   p=R::runif(0,1);
   b2=b*b;
-  sum= ((abs(b)==0)?1:0)*pi[0]+pi[1]*(1.0/sqrt(0.0001))*exp((-0.5*b2)/(0.0001*sigmaG)) +pi[2]*(1.0/sqrt(0.001))*exp((-0.5*b2)/(0.001*sigmaG))+pi[3]*(1.0/sqrt(0.01))*exp((-0.5*b2)/(0.01*sigmaG));
+  sum= ((std::abs(b)==0)?1:0)*pi[0]+pi[1]*(1.0/sqrt(0.0001))*exp((-0.5*b2)/(0.0001*sigmaG)) +pi[2]*(1.0/sqrt(0.001))*exp((-0.5*b2)/(0.001*sigmaG))+pi[3]*(1.0/sqrt(0.01))*exp((-0.5*b2)/(0.01*sigmaG));
   //not pretty but will save space if done concurrently, binary search
-  if(p<=((abs(b)==0)?1:0)*pi[0]/sum+pi[1]*(1.0/sqrt(0.0001))*exp((-0.5*b2)/(0.0001*sigmaG))/sum){
-    if(p<=((abs(b)==0)?1:0)*pi[0]/sum)
+  if(p<=((std::abs(b)==0)?1:0)*pi[0]/sum+pi[1]*(1.0/sqrt(0.0001))*exp((-0.5*b2)/(0.0001*sigmaG))/sum){
+    if(p<=((std::abs(b)==0)?1:0)*pi[0]/sum)
       return 0;
     else
       return 0.0001;
   }
   else
   {
-    if(p<=((abs(b)==0)?1:0)*pi[0]/sum+pi[1]*(1.0/sqrt(0.0001))*exp((-0.5*b2)/(0.0001*sigmaG))/sum+pi[2]*(1.0/sqrt(0.001))*exp((-0.5*b2)/(0.001*sigmaG))/sum)
+    if(p<=((std::abs(b)==0)?1:0)*pi[0]/sum+pi[1]*(1.0/sqrt(0.0001))*exp((-0.5*b2)/(0.0001*sigmaG))/sum+pi[2]*(1.0/sqrt(0.001))*exp((-0.5*b2)/(0.001*sigmaG))/sum)
       return 0.001;
     else
       return  0.01;

@@ -103,8 +103,8 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
 
   beta.setRandom();
   mu=norm(gen);
-  sigmaE=abs(norm_rng(0,1));
-  sigmaG=abs(norm_rng(0,1));
+  sigmaE=std::abs(norm_rng(0,1));
+  sigmaG=std::abs(norm_rng(0,1));
   pi=dirichilet_rng(priorPi);
   components.unaryExpr(categorical_init<double>(priorPi));
   residues=Y-X*beta;
@@ -116,7 +116,7 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
     beta= mvnCoef_rng(1,(xtY- mu*xS),xtX,sigmaG*components);
     beta = (components.array() > 1e-10 ).select(beta, MatrixXd::Zero(beta.rows(), beta.cols()));
     residues=Y-X*beta;
-    m0=(components.array()>1e-10).count();
+    m0=(components.array()>0).count();
     sigmaG=inv_scaled_chisq_rng(v0+m0,((beta.array()).pow(2).sum()+v0*s02)/(v0+m0));
     sigmaE=inv_scaled_chisq_rng(v0+N,(((residues.array()-mu).array().pow(2)).sum()+v0*s02)/(v0+N));
     v(0)=priorPi[0]+(components.array()==cVa[0]).count();
@@ -148,20 +148,6 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
 //
 
 /*** R
-M=100
-N=10000
-B=matrix(rnorm(M,sd=sqrt(0.01)),ncol=1)
-B[sample(1:100,30),1]=0
-  X <- matrix(rnorm(M*N), N, M)
-  Y=X%*%B+rnorm(N,sd=0.001)
- # Y=scale(Y)
-#  X=scale(X)
-
-tmp<-BayesRSampler(3000, 11000, 1,1,X, Y,0.01,0.01)
-plot(B,colMeans(tmp$beta[10000:11000,]))
-lines(B,B)
-abline(h=0)
-
 M=100
 N=2000
 B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
