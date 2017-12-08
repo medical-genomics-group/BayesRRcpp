@@ -163,7 +163,7 @@ lines(B,B)
 abline(h=0)
 
 M=100
-N=5000
+N=2000
 B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
@@ -174,7 +174,10 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
           plot(B,colMeans(tmp$beta[10000:11000,]))
           lines(B,B)
           abline(h=0)
-
+          var(G)
+          colMeans(tmp$sum_beta_sqr)
+          1-var(G)
+          colMeans(tmp$sigmaE)
 
   */
 
