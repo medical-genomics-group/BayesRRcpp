@@ -154,12 +154,27 @@ B=matrix(rnorm(M,sd=sqrt(0.01)),ncol=1)
 B[sample(1:100,30),1]=0
   X <- matrix(rnorm(M*N), N, M)
   Y=X%*%B+rnorm(N,sd=0.001)
- Y=scale(Y)
- X=scale(X)
+ # Y=scale(Y)
+#  X=scale(X)
 
 tmp<-BayesRSampler(3000, 11000, 1,1,X, Y,0.01,0.01)
 plot(B,colMeans(tmp$beta[10000:11000,]))
 lines(B,B)
 abline(h=0)
+
+M=100
+N=5000
+B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
+  X <- matrix(rnorm(M*N), N, M); var(X[,1])
+    G <- X%*%B; var(G)
+      Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
+        tmp<-BayesRSampler(1, 11000, 1,1,X, Y,0.01,0.01)
+        names(tmp)
+        plot(tmp$sigmaG); mean(tmp$sigmaG)
+          plot(B,colMeans(tmp$beta[10000:11000,]))
+          lines(B,B)
+          abline(h=0)
+
+
   */
 
