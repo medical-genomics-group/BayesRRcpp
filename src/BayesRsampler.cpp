@@ -135,17 +135,16 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
       //std::cout<< "block size: "<< endSegment-beginSegment+1;
       if(beginSegment==0){
         //std::cout<<"begin segment \n";
-        mu_b=-mu*(X.leftCols(b).eval().transpose().eval().rowwise().sum())+(X.leftCols(b).eval()).transpose().eval()*(Y-((X.rightCols(M-b).eval())*beta.bottomRows(M-b)).eval());
+        mu_b=(X.leftCols(b)).transpose().eval()*(Y- mu*ones-((X.rightCols(M-b))*beta.bottomRows(M-b)));
       }
       else{
         if(beginSegment+b-1>=(M-1)){
          // std::cout<<"end segment\n";
-          mu_b=-mu*(X.rightCols(M-beginSegment).eval().transpose()).eval().rowwise().sum()+((X.rightCols(M-beginSegment).eval()).transpose()).eval()*(Y-((X.leftCols(beginSegment).eval())*beta.topRows(beginSegment)).eval());
+          mu_b=((X.rightCols(M-beginSegment)).transpose()).eval()*(Y-mu*ones-((X.leftCols(beginSegment))*beta.topRows(beginSegment)));
         }
         else{
           //std::cout<<"middle segment\n";
-          mu_b=-mu*(X.middleCols(beginSegment,b).eval().transpose()).eval().rowwise().sum()+(((X.middleCols(beginSegment,b).eval()).transpose()).eval())*(Y-((X.leftCols(beginSegment).eval())*beta.topRows(beginSegment)).eval())
-          +(((X.middleCols(beginSegment,b).eval()).transpose()).eval())*(Y-((X.rightCols(M-endSegment-1).eval())*beta.bottomRows(M-endSegment-1)).eval());
+          mu_b=(((X.middleCols(beginSegment,b)).transpose()).eval())*(Y-mu*ones-((X.leftCols(beginSegment))*beta.topRows(beginSegment))-((X.rightCols(M-endSegment-1))*beta.bottomRows(M-endSegment-1)));
         }
 
       }
@@ -207,9 +206,9 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
           lines(B,B)
           abline(h=0)
           var(G)
-          colMeans(tmp$sum_beta_sqr)
+          mean(tmp$sum_beta_sqr[19000:20000])
           1-var(G)
-          colMeans(tmp$sigmaE)
+          mean(tmp$sigmaE[19000:20000])
 
   */
 
