@@ -199,6 +199,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// slicingTest
+void slicingTest(int M, int B);
+RcppExport SEXP _BayesRRcpp_slicingTest(SEXP MSEXP, SEXP BSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type M(MSEXP);
+    Rcpp::traits::input_parameter< int >::type B(BSEXP);
+    slicingTest(M, B);
+    return R_NilValue;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_BayesRSamplerL", (DL_FUNC) &_BayesRRcpp_BayesRSamplerL, 10},
@@ -215,6 +226,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_mvn_rng", (DL_FUNC) &_BayesRRcpp_mvn_rng, 3},
     {"_BayesRRcpp_mvnCoef_rng", (DL_FUNC) &_BayesRRcpp_mvnCoef_rng, 4},
     {"_BayesRRcpp_mvnCoef_rngAug", (DL_FUNC) &_BayesRRcpp_mvnCoef_rngAug, 4},
+    {"_BayesRRcpp_slicingTest", (DL_FUNC) &_BayesRRcpp_slicingTest, 2},
     {NULL, NULL, 0}
 };
 

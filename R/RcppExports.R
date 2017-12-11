@@ -57,3 +57,7 @@ mvnCoef_rngAug <- function(nn, y, x, d) {
     .Call(`_BayesRRcpp_mvnCoef_rngAug`, nn, y, x, d)
 }
 
+slicingTest <- function(M, B) {
+    invisible(.Call(`_BayesRRcpp_slicingTest`, M, B))
+}
+

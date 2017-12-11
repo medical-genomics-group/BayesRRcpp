@@ -57,6 +57,8 @@ struct categorical_init
 
 // [[Rcpp::export]]
 Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02, int B) {
+  Eigen::initParallel();
+  Eigen::setNbThreads(10);
   int N(Y.size());
   int M(X.cols());
   double mu;
@@ -89,8 +91,12 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   Map<MatrixXd> xM(X.data(),N,M);
   VectorXd v(4);
   MatrixXd mu_b(b,1);
+  VectorXd ones(N);
+
   int beginSegment;
   int endSegment;
+
+  ones.setOnes();
   M=X.cols();
   N=Y.rows();
   xtX=AtA(xM);
@@ -113,6 +119,9 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   components.unaryExpr(categorical_init<double>(priorPi));
   residues=Y-X*beta;
   std::cout<<"block size " << b <<"\n";
+  std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
+
   for(int iteration=0; iteration < max_iterations; iteration++){
     std::cout << "iteration: "<<iteration <<"\n";
     mu = norm_rng((1/(double)N)*residues.sum(), sigmaE/(double)N);
@@ -135,8 +144,8 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
         }
         else{
           //std::cout<<"middle segment\n";
-         // mu_b=(((X.middleCols(beginSegment,endSegment).eval()).transpose()).eval())*(Y-((X.leftCols(beginSegment)).eval()*beta.topRows(beginSegment).eval()));//+
-            //X.rightCols(M-endSegment-1)*beta.bottomRows(M-endSegment-1)))-mu*X.middleCols(beginSegment,endSegment).transpose();
+          mu_b=-mu*(X.middleCols(beginSegment,b).eval().transpose()).eval().rowwise().sum()+(((X.middleCols(beginSegment,b).eval()).transpose()).eval())*(Y-((X.leftCols(beginSegment).eval())*beta.topRows(beginSegment)).eval())
+          +(((X.middleCols(beginSegment,b).eval()).transpose()).eval())*(Y-((X.rightCols(M-endSegment-1).eval())*beta.bottomRows(M-endSegment-1)).eval());
         }
 
       }
@@ -165,6 +174,10 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
     componentsL.col(iteration)=components;
     sum_beta_sqr(iteration)= ((beta.sparseView().cwiseProduct(beta).cwiseProduct(components.cwiseInverse())).sum()+v0*s02)/(m0+v0);
   }
+
+  std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::seconds>( t2 - t1 ).count();
+  std::cout << "duration: "<<duration << "s\n";
     return Rcpp::List::create(Rcpp::Named("beta")=betaL.transpose(),
                               Rcpp::Named("sigmaG")=sigmaGL.transpose(),
                               Rcpp::Named("sigmaE")=sigmaEL.transpose(),
@@ -187,10 +200,10 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-        tmp<-BayesRSampler(1, 2000, 1,1,X, Y,0.01,0.01,2)
+        tmp<-BayesRSampler(1, 20000, 1,1,X, Y,0.01,0.01,4)
         names(tmp)
         plot(tmp$sigmaG); mean(tmp$sigmaG)
-          plot(B,colMeans(tmp$beta))
+          plot(B,colMeans(tmp$beta[19000:20000,]))
           lines(B,B)
           abline(h=0)
           var(G)
