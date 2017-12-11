@@ -57,8 +57,7 @@ struct categorical_init
 
 // [[Rcpp::export]]
 Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02, int B) {
-  Eigen::initParallel();
-  Eigen::setNbThreads(10);
+ 
   int N(Y.size());
   int M(X.cols());
   double mu;
@@ -90,7 +89,7 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   MatrixXd sum_beta_sqr(1,max_iterations);
   Map<MatrixXd> xM(X.data(),N,M);
   VectorXd v(4);
-  MatrixXd mu_b(b,1);
+  MatrixXd mu_b(N,1);
   VectorXd ones(N);
 
   int beginSegment;
@@ -117,8 +116,10 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   sigmaG=std::abs(norm_rng(0,1));
   pi=dirichilet_rng(priorPi);
   components.unaryExpr(categorical_init<double>(priorPi));
-  residues=Y-X*beta;
+ // residues=Y-mu*ones;
   std::cout<<"block size " << b <<"\n";
+  Eigen::initParallel();
+  Eigen::setNbThreads(100);
   std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
 
@@ -126,6 +127,7 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
     std::cout << "iteration: "<<iteration <<"\n";
     mu = norm_rng((1/(double)N)*residues.sum(), sigmaE/(double)N);
     components= beta.unaryExpr(categorical_functor<double>(pi,sigmaG));
+    residues= Y-mu*ones;
     for(int block=0; block < M;block+=b){
       //std::cout<<"begin block: "<< block<<" ";
       beginSegment=block;
@@ -135,31 +137,31 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
       //std::cout<< "block size: "<< endSegment-beginSegment+1;
       if(beginSegment==0){
         //std::cout<<"begin segment \n";
-        mu_b=(X.leftCols(b)).transpose().eval()*(Y- mu*ones-((X.rightCols(M-b))*beta.bottomRows(M-b)));
+        mu_b=(residues-((X.rightCols(M-b))*beta.bottomRows(M-b)));
       }
       else{
         if(beginSegment+b-1>=(M-1)){
          // std::cout<<"end segment\n";
-          mu_b=((X.rightCols(M-beginSegment)).transpose()).eval()*(Y-mu*ones-((X.leftCols(beginSegment))*beta.topRows(beginSegment)));
+          mu_b=(residues-((X.leftCols(beginSegment))*beta.topRows(beginSegment)));
         }
         else{
           //std::cout<<"middle segment\n";
-          mu_b=(((X.middleCols(beginSegment,b)).transpose()).eval())*(Y-mu*ones-((X.leftCols(beginSegment))*beta.topRows(beginSegment))-((X.rightCols(M-endSegment-1))*beta.bottomRows(M-endSegment-1)));
+          mu_b=(residues-((X.leftCols(beginSegment))*beta.topRows(beginSegment))-((X.rightCols(M-endSegment-1))*beta.bottomRows(M-endSegment-1)));
         }
 
       }
 
 
       beta.block(beginSegment,0,b,1)= mvnCoef_rng(1,
-                   mu_b,
+                   X.block(0,beginSegment,N,b).transpose()*mu_b,
                    xtX.block(beginSegment,beginSegment,b,b),
                    sigmaG*components.segment(beginSegment,b));
     }
     beta = (components.array() > 1e-10 ).select(beta, MatrixXd::Zero(beta.rows(), beta.cols()));
-    residues=Y-X*beta;
+    residues=Y-mu*ones-X*beta;
     m0=(components.array()>0).count();
     sigmaG=inv_scaled_chisq_rng(v0+m0,((beta.array()).pow(2).sum()+v0*s02)/(v0+m0));
-    sigmaE=inv_scaled_chisq_rng(v0+N,(((residues.array()-mu).array().pow(2)).sum()+v0*s02)/(v0+N));
+    sigmaE=inv_scaled_chisq_rng(v0+N,(((residues).array().pow(2)).sum()+v0*s02)/(v0+N));
     v(0)=priorPi[0]+(components.array()==cVa[0]).count();
     v(1)=priorPi[1]+(components.array()==cVa[1]).count();
     v(2)=priorPi[2]+(components.array()==cVa[2]).count();
@@ -199,16 +201,16 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-        tmp<-BayesRSampler(1, 20000, 1,1,X, Y,0.01,0.01,4)
+        tmp<-BayesRSampler(1, 1000, 1,1,X, Y,0.01,0.01,4)
         names(tmp)
         plot(tmp$sigmaG); mean(tmp$sigmaG)
-          plot(B,colMeans(tmp$beta[19000:20000,]))
+          plot(B,colMeans(tmp$beta[900:1000,]))
           lines(B,B)
           abline(h=0)
           var(G)
-          mean(tmp$sum_beta_sqr[19000:20000])
+          mean(tmp$sum_beta_sqr[900:1000])
           1-var(G)
-          mean(tmp$sigmaE[19000:20000])
+          mean(tmp$sigmaE[9:1000])
 
   */
 
