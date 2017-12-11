@@ -9,8 +9,12 @@ BayesRSamplerM <- function(seed, max_iterations, burn_in, thinning, X, Y, v0, s0
     .Call(`_BayesRRcpp_BayesRSamplerM`, seed, max_iterations, burn_in, thinning, X, Y, v0, s02)
 }
 
-BayesRSampler <- function(seed, max_iterations, burn_in, thinning, X, Y, v0, s02) {
-    .Call(`_BayesRRcpp_BayesRSampler`, seed, max_iterations, burn_in, thinning, X, Y, v0, s02)
+BayesRSampler <- function(seed, max_iterations, burn_in, thinning, X, Y, v0, s02, B) {
+    .Call(`_BayesRRcpp_BayesRSampler`, seed, max_iterations, burn_in, thinning, X, Y, v0, s02, B)
+}
+
+cotMAt <- function() {
+    .Call(`_BayesRRcpp_cotMAt`)
 }
 
 dirichilet_rng <- function(alpha) {

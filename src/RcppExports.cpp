@@ -45,8 +45,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // BayesRSampler
-Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double v0, double s02);
-RcppExport SEXP _BayesRRcpp_BayesRSampler(SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP v0SEXP, SEXP s02SEXP) {
+Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double v0, double s02, int B);
+RcppExport SEXP _BayesRRcpp_BayesRSampler(SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP v0SEXP, SEXP s02SEXP, SEXP BSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -58,7 +58,18 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
     Rcpp::traits::input_parameter< double >::type v0(v0SEXP);
     Rcpp::traits::input_parameter< double >::type s02(s02SEXP);
-    rcpp_result_gen = Rcpp::wrap(BayesRSampler(seed, max_iterations, burn_in, thinning, X, Y, v0, s02));
+    Rcpp::traits::input_parameter< int >::type B(BSEXP);
+    rcpp_result_gen = Rcpp::wrap(BayesRSampler(seed, max_iterations, burn_in, thinning, X, Y, v0, s02, B));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cotMAt
+int cotMAt();
+RcppExport SEXP _BayesRRcpp_cotMAt() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(cotMAt());
     return rcpp_result_gen;
 END_RCPP
 }
@@ -192,7 +203,8 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_BayesRSamplerL", (DL_FUNC) &_BayesRRcpp_BayesRSamplerL, 10},
     {"_BayesRRcpp_BayesRSamplerM", (DL_FUNC) &_BayesRRcpp_BayesRSamplerM, 8},
-    {"_BayesRRcpp_BayesRSampler", (DL_FUNC) &_BayesRRcpp_BayesRSampler, 8},
+    {"_BayesRRcpp_BayesRSampler", (DL_FUNC) &_BayesRRcpp_BayesRSampler, 9},
+    {"_BayesRRcpp_cotMAt", (DL_FUNC) &_BayesRRcpp_cotMAt, 0},
     {"_BayesRRcpp_dirichilet_rng", (DL_FUNC) &_BayesRRcpp_dirichilet_rng, 1},
     {"_BayesRRcpp_inv_gamma_rng", (DL_FUNC) &_BayesRRcpp_inv_gamma_rng, 2},
     {"_BayesRRcpp_inv_scaled_chisq_rng", (DL_FUNC) &_BayesRRcpp_inv_scaled_chisq_rng, 2},

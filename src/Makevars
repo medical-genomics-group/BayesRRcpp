@@ -1,2 +1,3 @@
 ## -*- mode: Makefile; -*-
 PKG_LIBS = $(FLIBS)
+CPPFLAGS += -I/Users/admin/repo/ctggroup/libgl/libigl/include/igl

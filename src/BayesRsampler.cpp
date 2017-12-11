@@ -5,6 +5,7 @@
 #include "distributions.h"
 #include "MultVar.h"
 
+
 // [[Rcpp::depends(RcppEigen)]]
 using namespace Rcpp;
 using namespace RcppEigen;
@@ -55,7 +56,7 @@ struct categorical_init
 
 
 // [[Rcpp::export]]
-Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02) {
+Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02, int B) {
   int N(Y.size());
   int M(X.cols());
   double mu;
@@ -64,7 +65,7 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   int m0;
   std::random_device rd;
   std::mt19937 gen(rd());
-
+  int b(M/B);
   // values near the mean are the most likely
   // standard deviation affects the dispersion of generated values from the mean
   std::normal_distribution<> norm(0,1);
@@ -87,6 +88,9 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   MatrixXd sum_beta_sqr(1,max_iterations);
   Map<MatrixXd> xM(X.data(),N,M);
   VectorXd v(4);
+  MatrixXd mu_b(b,1);
+  int beginSegment;
+  int endSegment;
   M=X.cols();
   N=Y.rows();
   xtX=AtA(xM);
@@ -108,12 +112,41 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   pi=dirichilet_rng(priorPi);
   components.unaryExpr(categorical_init<double>(priorPi));
   residues=Y-X*beta;
-
+  std::cout<<"block size " << b <<"\n";
   for(int iteration=0; iteration < max_iterations; iteration++){
     std::cout << "iteration: "<<iteration <<"\n";
     mu = norm_rng((1/(double)N)*residues.sum(), sigmaE/(double)N);
     components= beta.unaryExpr(categorical_functor<double>(pi,sigmaG));
-    beta= mvnCoef_rng(1,(xtY- mu*xS),xtX,sigmaG*components);
+    for(int block=0; block < M;block+=b){
+      //std::cout<<"begin block: "<< block<<" ";
+      beginSegment=block;
+      endSegment=(block+b-1)>=(M-1)?(M-1):(block+b-1);
+      //
+      //std::cout<< "end block: "<< endSegment;
+      //std::cout<< "block size: "<< endSegment-beginSegment+1;
+      if(beginSegment==0){
+        //std::cout<<"begin segment \n";
+        mu_b=-mu*(X.leftCols(b).eval().transpose().eval().rowwise().sum())+(X.leftCols(b).eval()).transpose().eval()*(Y-((X.rightCols(M-b).eval())*beta.bottomRows(M-b)).eval());
+      }
+      else{
+        if(beginSegment+b-1>=(M-1)){
+         // std::cout<<"end segment\n";
+          mu_b=-mu*(X.rightCols(M-beginSegment).eval().transpose()).eval().rowwise().sum()+((X.rightCols(M-beginSegment).eval()).transpose()).eval()*(Y-((X.leftCols(beginSegment).eval())*beta.topRows(beginSegment)).eval());
+        }
+        else{
+          //std::cout<<"middle segment\n";
+         // mu_b=(((X.middleCols(beginSegment,endSegment).eval()).transpose()).eval())*(Y-((X.leftCols(beginSegment)).eval()*beta.topRows(beginSegment).eval()));//+
+            //X.rightCols(M-endSegment-1)*beta.bottomRows(M-endSegment-1)))-mu*X.middleCols(beginSegment,endSegment).transpose();
+        }
+
+      }
+
+
+      beta.block(beginSegment,0,b,1)= mvnCoef_rng(1,
+                   mu_b,
+                   xtX.block(beginSegment,beginSegment,b,b),
+                   sigmaG*components.segment(beginSegment,b));
+    }
     beta = (components.array() > 1e-10 ).select(beta, MatrixXd::Zero(beta.rows(), beta.cols()));
     residues=Y-X*beta;
     m0=(components.array()>0).count();
@@ -154,10 +187,10 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-        tmp<-BayesRSampler(1, 11000, 1,1,X, Y,0.01,0.01)
+        tmp<-BayesRSampler(1, 2000, 1,1,X, Y,0.01,0.01,2)
         names(tmp)
         plot(tmp$sigmaG); mean(tmp$sigmaG)
-          plot(B,colMeans(tmp$beta[10000:11000,]))
+          plot(B,colMeans(tmp$beta))
           lines(B,B)
           abline(h=0)
           var(G)
