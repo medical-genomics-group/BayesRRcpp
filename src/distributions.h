@@ -13,5 +13,5 @@ double norm_rng(double mu, double sigma2);
 double component_probs(double b,Eigen::VectorXd pi,double sigmaG);
 double categorical(Eigen::VectorXd probs);
 double beta_rng(double a, double b);
-double spike_slab_rng(double w,double lambda, double sigmaS);
+//double spike_slab_rng(double w,double lambda, double sigmaS);
 #endif

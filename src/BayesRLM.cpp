@@ -137,7 +137,7 @@ Rcpp::List BayesRSamplerL(int seed, int max_iterations, int burn_in,int thinning
       for(int j=0;j<Q;j++)
         if(i!=j){
           sigmaS(j,i)=inv_gamma_rng(a1+0.5,a2+ (lambda(j,i)*lambda(j,i)/2));
-          spikeSlab(j,i)=spike_slab_rng(w,lambda(j,i),sigmaS(j,i));
+          spikeSlab(j,i)=1;//spike_slab_rng(w,lambda(j,i),sigmaS(j,i));
         }
 
     }

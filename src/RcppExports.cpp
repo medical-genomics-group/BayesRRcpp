@@ -63,16 +63,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// cotMAt
-int cotMAt();
-RcppExport SEXP _BayesRRcpp_cotMAt() {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    rcpp_result_gen = Rcpp::wrap(cotMAt());
-    return rcpp_result_gen;
-END_RCPP
-}
 // dirichilet_rng
 Eigen::VectorXd dirichilet_rng(Eigen::VectorXd alpha);
 RcppExport SEXP _BayesRRcpp_dirichilet_rng(SEXP alphaSEXP) {
@@ -215,7 +205,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_BayesRSamplerL", (DL_FUNC) &_BayesRRcpp_BayesRSamplerL, 10},
     {"_BayesRRcpp_BayesRSamplerM", (DL_FUNC) &_BayesRRcpp_BayesRSamplerM, 8},
     {"_BayesRRcpp_BayesRSampler", (DL_FUNC) &_BayesRRcpp_BayesRSampler, 9},
-    {"_BayesRRcpp_cotMAt", (DL_FUNC) &_BayesRRcpp_cotMAt, 0},
     {"_BayesRRcpp_dirichilet_rng", (DL_FUNC) &_BayesRRcpp_dirichilet_rng, 1},
     {"_BayesRRcpp_inv_gamma_rng", (DL_FUNC) &_BayesRRcpp_inv_gamma_rng, 2},
     {"_BayesRRcpp_inv_scaled_chisq_rng", (DL_FUNC) &_BayesRRcpp_inv_scaled_chisq_rng, 2},

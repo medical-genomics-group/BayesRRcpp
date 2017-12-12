@@ -130,27 +130,15 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
     components= beta.unaryExpr(categorical_functor<double>(pi,sigmaG));
     mu_f.setZero();
     for(int block=0; block < M;block+=b){
-      //std::cout<<"begin block: "<< block<<" ";
       beginSegment=block;
       endSegment=(block+b-1)>=(M-1)?(M-1):(block+b-1);
-      //
-      //std::cout<< "end block: "<< endSegment;
-      //std::cout<< "block size: "<< endSegment-beginSegment+1;
       if(beginSegment==0){
-        //std::cout<<"begin segment \n";
         mu_b=residues-((X.block(0,0,N,b)*beta.block(0,0,b,1)));
 
       }
       else{
 
-         // std::cout<<"end segment\n";
           mu_b+=(-X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1));
-
-        //else{
-          //std::cout<<"middle segment\n";
-          //mu_b=(residues-((X.leftCols(beginSegment))*beta.topRows(beginSegment))-((X.rightCols(M-endSegment-1))*beta.bottomRows(M-endSegment-1)));
-        //}
-
       }
 
 
@@ -158,9 +146,10 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
                    X.block(0,beginSegment,N,b).transpose()*(Y-mu*ones-mu_b-mu_f),
                    xtX.block(beginSegment,beginSegment,b,b),
                    sigmaG*components.segment(beginSegment,b));
+      beta.block(beginSegment,0,b,1) = (components.block(beginSegment,0,b,1).array() > 1e-10 ).select(beta.block(beginSegment,0,b,1), MatrixXd::Zero(b,1));
       mu_f+=X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1);
     }
-    beta = (components.array() > 1e-10 ).select(beta, MatrixXd::Zero(beta.rows(), beta.cols()));
+
     residues=mu_f;
     m0=(components.array()>0).count();
     sigmaG=inv_scaled_chisq_rng(v0+m0,((beta.array()).pow(2).sum()+v0*s02)/(v0+m0));
@@ -198,13 +187,13 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
 //
 
 /*** R
-M=1000
+M=10000
 N=20000
 B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-        tmp<-BayesRSampler(1, 1000, 1,1,X, Y,0.01,0.01,100)
+        tmp<-BayesRSampler(1, 1000, 1,1,X, Y,0.01,0.01,1000)
         names(tmp)
         plot(tmp$sigmaG); mean(tmp$sigmaG)
           plot(B,colMeans(tmp$beta[900:1000,]))
