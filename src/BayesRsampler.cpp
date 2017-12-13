@@ -60,13 +60,12 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
  int flag;
   std::stringstream buffer;
   flag=0;
-  #pragma omp parallel  shared(flag,buffer)
+  #pragma omp parallel num_threads(2) shared(flag,buffer)
 {
     #pragma omp sections
     {
 
 {
-  std::cout <<"hello world";
   int N(Y.size());
   int M(X.cols());
   double mu;
@@ -107,9 +106,8 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
   ones.setOnes();
   M=X.cols();
   N=Y.rows();
+  std::cout<<" computing XtX\n";
   xtX=AtA(xM);
-  xtY=X.transpose()*Y;
-  xS=X.transpose().rowwise().sum();
   priorPi.setOnes();
   priorPi*=0.25;
   cVa[0] = 0;
@@ -129,7 +127,8 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
 
 
   std::cout<<"block size " << b <<"\n";
-  //Eigen::initParallel();
+  Eigen::initParallel();
+  Eigen::setNbThreads(10);
   std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
   residues= X*beta;
@@ -171,7 +170,7 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
     pi=dirichilet_rng(v);
 
     sum_beta_sqr(iteration)= ((beta.sparseView().cwiseProduct(beta).cwiseProduct(components.cwiseInverse())).sum()+v0*s02)/(m0+v0);
-    if(iteration > burn_in)
+    if(iteration >= burn_in)
       buffer << iteration <<"\t"<< mu <<"\t"<< beta.col(1).transpose()<<"\t"<< sigmaG <<"\t"<<sigmaE <<"\t"<< components.transpose()<<  "\n";
     //buff<<"sigma\n" ;
 
@@ -190,6 +189,8 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
     #pragma omp critical
     outFile<< buffer.str();
   }
+  outFile.close();
+  buffer.str(std::string());
 }
 
     }
@@ -202,13 +203,13 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
 //
 
 /*** R
-M=100
-N=2000
+M=10000
+N=20000
 B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-       BayesRSampler(1, 2000, 1900,1,X, Y,0.01,0.01,2)
+       BayesRSampler(1, 200, 100,1,X, Y,0.01,0.01,1000)
 #        names(tmp)
  #       plot(tmp$sigmaG); mean(tmp$sigmaG)
 #        plot(B,colMeans(tmp$beta[900:1000,]))
