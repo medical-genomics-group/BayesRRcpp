@@ -1,3 +1,5 @@
+#include <omp.h>
+// [[Rcpp::plugins(openmp)]]
 #include <Rcpp.h>
 #include <RcppEigen.h>
 #include <Eigen/Core>
@@ -53,11 +55,18 @@ struct categorical_init
   const Scalar operator()(const Scalar& x) const{ return categorical(m_c); }
   Eigen::VectorXd m_c;
 };
-
-
 // [[Rcpp::export]]
-Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02, int B) {
+void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02, int B) {
+ int flag;
+  std::stringstream buffer;
+  flag=0;
+  #pragma omp parallel  shared(flag,buffer)
+{
+    #pragma omp sections
+    {
 
+{
+  std::cout <<"hello world";
   int N(Y.size());
   int M(X.cols());
   double mu;
@@ -77,12 +86,6 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   VectorXd residues;
   VectorXd components(M);
   MatrixXd beta(M,1);
-  MatrixXd betaL(M,max_iterations);
-  MatrixXd componentsL(M,max_iterations);
-  MatrixXd sigmaGL(1,max_iterations);
-  MatrixXd sigmaEL(1,max_iterations);
-  MatrixXd muL(1,max_iterations);
-  MatrixXd piL(4,max_iterations);
   MatrixXd xtX(M,M);
   MatrixXd xtY(M,1);
   MatrixXd xS(M,1);
@@ -95,6 +98,11 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
 
   int beginSegment;
   int endSegment;
+  //std::ofstream file("test.txt");
+
+  //Eigen::setNbThreads(100);
+
+  /////end of declarations//////
 
   ones.setOnes();
   M=X.cols();
@@ -117,13 +125,15 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
   sigmaG=std::abs(norm_rng(0,1));
   pi=dirichilet_rng(priorPi);
   components.unaryExpr(categorical_init<double>(priorPi));
- // residues=Y-mu*ones;
+  // residues=Y-mu*ones;
+
+
   std::cout<<"block size " << b <<"\n";
-  Eigen::initParallel();
-  Eigen::setNbThreads(100);
+  //Eigen::initParallel();
   std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
   residues= X*beta;
+
   for(int iteration=0; iteration < max_iterations; iteration++){
     std::cout << "iteration: "<<iteration <<"\n";
     mu = norm_rng((1/(double)N)*residues.sum(), sigmaE/(double)N);
@@ -138,14 +148,14 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
       }
       else{
 
-          mu_b+=(-X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1));
+        mu_b+=(-X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1));
       }
 
 
       beta.block(beginSegment,0,b,1)= mvnCoef_rng(1,
-                   X.block(0,beginSegment,N,b).transpose()*(Y-mu*ones-mu_b-mu_f),
-                   xtX.block(beginSegment,beginSegment,b,b),
-                   sigmaG*components.segment(beginSegment,b));
+                 X.block(0,beginSegment,N,b).transpose()*(Y-mu*ones-mu_b-mu_f),
+                 xtX.block(beginSegment,beginSegment,b,b),
+                 sigmaG*components.segment(beginSegment,b));
       beta.block(beginSegment,0,b,1) = (components.block(beginSegment,0,b,1).array() > 1e-10 ).select(beta.block(beginSegment,0,b,1), MatrixXd::Zero(b,1));
       mu_f+=X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1);
     }
@@ -159,50 +169,55 @@ Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,
     v(2)=priorPi[2]+(components.array()==cVa[2]).count();
     v(3)=priorPi[3]+(components.array()==cVa[3]).count();
     pi=dirichilet_rng(v);
-    betaL.col(iteration)=beta;
-    sigmaGL(1,iteration)=sigmaG;
-    sigmaEL(1,iteration)=sigmaE;
-    muL(1,iteration)=mu;
-    piL.col(iteration)=pi;
-    componentsL.col(iteration)=components;
+
     sum_beta_sqr(iteration)= ((beta.sparseView().cwiseProduct(beta).cwiseProduct(components.cwiseInverse())).sum()+v0*s02)/(m0+v0);
+    if(iteration > burn_in)
+      buffer << iteration <<"\t"<< mu <<"\t"<< beta.col(1).transpose()<<"\t"<< sigmaG <<"\t"<<sigmaE <<"\t"<< components.transpose()<<  "\n";
+    //buff<<"sigma\n" ;
+
   }
 
   std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::seconds>( t2 - t1 ).count();
   std::cout << "duration: "<<duration << "s\n";
-    return Rcpp::List::create(Rcpp::Named("beta")=betaL.transpose(),
-                              Rcpp::Named("sigmaG")=sigmaGL.transpose(),
-                              Rcpp::Named("sigmaE")=sigmaEL.transpose(),
-                              Rcpp::Named("pi")=piL.transpose(),
-                              Rcpp::Named("components")=componentsL.transpose(),
-                              Rcpp::Named("mu")=muL.transpose(),
-                              Rcpp::Named("sum_beta_sqr")=sum_beta_sqr.transpose());
+  flag=1;
+}
+#pragma omp section
+{
+  std::ofstream outFile;
+  outFile.open("test.txt");
+  while(!flag){
+    #pragma omp critical
+    outFile<< buffer.str();
+  }
 }
 
+    }
+}
 
+}
 // You can include R code blocks in C++ files processed with sourceCpp
 // (useful for testing and development). The R code will be automatically
 // run after the compilation.
 //
 
 /*** R
-M=10000
-N=20000
+M=100
+N=2000
 B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-        tmp<-BayesRSampler(1, 1000, 1,1,X, Y,0.01,0.01,1000)
-        names(tmp)
-        plot(tmp$sigmaG); mean(tmp$sigmaG)
-          plot(B,colMeans(tmp$beta[900:1000,]))
-          lines(B,B)
-          abline(h=0)
-          var(G)
-          mean(tmp$sum_beta_sqr[900:1000])
-          1-var(G)
-          mean(tmp$sigmaE[900:1000])
+       BayesRSampler(1, 2000, 1900,1,X, Y,0.01,0.01,2)
+#        names(tmp)
+ #       plot(tmp$sigmaG); mean(tmp$sigmaG)
+#        plot(B,colMeans(tmp$beta[900:1000,]))
+ #       lines(B,B)
+#        abline(h=0)
+ #        var(G)
+ #       mean(tmp$sum_beta_sqr[900:1000])
+  #       1-var(G)
+   #      mean(tmp$sigmaE[900:1000])
 
   */
 
