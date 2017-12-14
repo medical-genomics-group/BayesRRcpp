@@ -35,15 +35,19 @@ library(BayesRRcpp)
 
 Then for the standard BayesR model we have the function
 
-BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02)
+```{bash,eval=F}
+BayesRSampler(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G, int B)
+```
 
 where 
+
+outputFile = File in which post burn_in samples will be saved. A dedicated thread is in charge of saving the samples as their are being produced using a concurrent queue, as such the memory overhead is expected to be low. The number of saved samples will be max_iterations-burn_in. I haven't put much effort on validating the file pahts and so on, for now I recommend suing only the file name, as such the output will be saved in the directory returned by getwd().
 
 seed= random seed; not functional for now
 
 max_iterations= number of samples
 
-burn_in= burn in samples; not implemented yet
+burn_in= burn in samples, it has to be an integer lower than max_iterations. 
 
 thinning= thinning regime; not implemented yet
 
@@ -51,9 +55,16 @@ X= matrix of markers (columns) and individuals(rows)
 
 Y= matrix of phenotypes (columns) and individuals(rows); if Y has more than one column, use the function BayesRSamplerM instead (which is slower).
 
-v0= prior degrees of freedom of the scaled inverse chi square distribution, set to a weakly informative value of 0.01
+sigma0 = variance of the prior over the random intercept, $\mu \sim \mathcal{N}\left(0,\sigma_0\right) $. Set to a weakly informative value of 0.01, if set to 0 then the prior becoms a noninformative uniform distribution.
 
-s02= prior scale for the scaled inverse chi square distribution, set to a weakly informative value of 0.01
+v0E,s02E=  degrees of freedom and variance of the prior scaled inverse chi square distribution over $\sigma_{E}$, set to a weakly informative value of 0.01
+
+v0G,s02G=  degrees of freedom and variance of the prior scaled inverse chi square distribution over $\sigma_{G}$, set to a weakly informative value of 0.01
+
+B = number of blocks in which the random effects will be sampled, for example for 1000 effects, a value B of 10 will involve 10 blocks of 100 effects conditionally drawn from a multivariate normal, which will involve a cholesky decomposition of a 100X100 matrix. We are reducing the size of matrix inversion in exchange of more computation (more matrix multiplications and more matrix inversions).
+
+Additional note: The current implementation relies on preprocessing and storing on memory the scatter matrix $ X^TX$. It is possible to evaluate this matrix block by block during sampling, thus reducing memory consumption but greatly increasing processing required. Depending on the performance tests we may chose one or the other.
+
 
 ```{r,message=F,warning=F}
 library(BayesRRcpp)
@@ -63,29 +74,59 @@ B=matrix(rnorm(M,sd=0.1),ncol=1)
 B[sample(1:100,30),1]=0#we randomly set 30 effects to zero
   X <- matrix(rnorm(M*N), N, M)
   Y=X%*%B+rnorm(N,sd=0.1)
-  Y=scale(Y)
-  X=scale(X)
+ ## seems that scaling is detrimental to the fit when there are some zero coefficients?
+  # Y=scale(Y)
+  #X=scale(X)
 
-tmp<-BayesRSampler(1, 11000, 1,1,X, Y,0.01,0.01)
-plot(B,colMeans(tmp$beta[10000:11000,]))
-lines(B,B)
+ BayesRSampler("test1.csv",1, 30000, 29000,1,X, Y,0.01,0.01,0.01,0.01,0.01,10)
+       library(readr)
+       tmp <- read_csv("./test1.csv")
+        #names(tmp)
+        #plot(tmp$sigmaG); mean(tmp$sigmaG)
+       plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
+        lines(B,B)
+        abline(h=0)
+
+M=100
+N=2000
+B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
+  X <- matrix(rnorm(M*N), N, M); var(X[,1])
+    G <- X%*%B; var(G)
+      Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
+      Y=scale(Y)
+      X=scale(X)
+       BayesRSampler("test2.csv",1, 30000, 29000,1,X, Y,0.01,0.01,0.01,0.01,0.01,2)
+       library(readr)
+       tmp <- read_csv("./test2.csv")
+        #names(tmp)
+        #plot(tmp$sigmaG); mean(tmp$sigmaG)
+       plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
+        lines(B,B)
+        abline(h=0)
+         var(G)
+        mean(tmp$EV)
+         1-var(G)
+         mean(tmp$sigmaE)
+         
 ```
 
-the sampler outputs a list whose members are
+the sampler outputs a matrix whose columns are
 
-beta= random effects
+beta= random effects $\beta$
 
-sigmaG= genetic effects variance
+sigmaG= genetic effects variance $\sigma_{G}$
 
-components= at which mixture each beta effects belongs
+components= component of the mixture from which each $\beta$ was drawn from.
 
-sigmaE = residuals variance
+sigmaE = residuals variance $\sigma_{E}$
 
-pi= mixing proportions
+pi= mixing proportions $\pi$
 
-mu= random intercept parameter
+mu= random intercept parameter $\mu$
 
-all variables are represented by columns, similarly to stan output.
+EV = explained variance as computed: $\mathrm{var} \left(X\beta\right)$ , for each sample of $\beta$ 
+
+each row contains a post burn_in set of samples for the variables.
 
 ## Installation on cluster
 
@@ -146,3 +187,36 @@ and now, assuming the build and installation succeeded you will be able to call 
 library(BayesRRcpp)
 ```
 
+
+## Installation on MAC
+
+in order to compile openMP programs on a mac we require to install llvm and its clang compiler. We will use homebrew:
+
+https://brew.sh/index_en.html
+
+After installing homebrew we will use it to install llvm (it will take a while):
+
+```{bash,eval=F}
+brew install --with-toolchain llvm
+```
+
+Now in order to use the new clang compiler in R studio it is necessary to create the file Makevars in your home directory
+
+```{bash,eval=F}
+mkdir ~/.R/
+vi Makevars
+```
+
+The file must contain the following lines 
+
+```{bash,eval=F}
+CXX="/usr/local/opt/llvm/bin/clang"
+CPPFLAGS +=  -std=c++11 -fopenmp -idirafter /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
+LDFLAGS+= -L/usr/local/opt/llvm/lib
+```
+
+CXX flag tell us to use the llvm clang compiler
+CPPFLAGS tell us to use C++11 openmp and the header files from Xcode.
+LDFLAGS tell us to use the lib files from llvm.
+
+hopefully set up wont vary much depending on your OSX version.

@@ -58,13 +58,30 @@ struct categorical_init
   Eigen::VectorXd m_c;
 };
 // [[Rcpp::export]]
-void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02, int B) {
+void BayesRSampler(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G, int B) {
  int flag;
   std::stringstream buffer;
   moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
   flag=0;
   int N(Y.size());
   int M(X.cols());
+  ////////////validate inputs
+  if(B>M || B<=0) /////////we validate the number of blocks
+  {
+    std::cout<<"error: Number of blocks has to be a positive integer and smaller than the number of covariates in the model (columns of X) ";
+    return;
+  }
+  if(max_iterations < burn_in || max_iterations<1 || burn_in<1) //validations related to mcmc burnin and iterations
+  {
+    std::cout<<"error: burn_in has to be a positive integer and smaller than the maximum number of iterations ";
+    return;
+  }
+  if(sigma0 < 0 || v0E < 0 || s02E < 0 || v0G < 0||  s02G < 0 )//validations related to hyperparameters
+  {
+    std::cout<<"error: hyper parameters have to be positive";
+    return;
+  }
+
   #pragma omp parallel num_threads(2) shared(flag,q,M,N)
 {
     #pragma omp sections
@@ -98,12 +115,11 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
   MatrixXd mu_b(N,1);
   VectorXd ones(N);
   VectorXd mu_f(N);
-  VectorXd sample(2*M+4);
+  VectorXd sample(2*M+5);
   int beginSegment;
   int endSegment;
-  //std::ofstream file("test.txt");
+  int blockNo;
 
-  //Eigen::setNbThreads(100);
 
   /////end of declarations//////
   Eigen::initParallel();
@@ -141,12 +157,22 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
 
   for(int iteration=0; iteration < max_iterations; iteration++){
     std::cout << "iteration: "<<iteration <<"\n";
-    mu = norm_rng((1/(double)N)*residues.sum(), sigmaE/(double)N);
+    mu = norm_rng((1/(double)N)*residues.sum(), 1.0/(sigma0+(double)N/sigmaE));
     components= beta.unaryExpr(categorical_functor<double>(pi,sigmaG));
     mu_f.setZero();
+
+    blockNo=1;
+    b=M/B;
     for(int block=0; block < M;block+=b){
+
       beginSegment=block;
       endSegment=(block+b-1)>=(M-1)?(M-1):(block+b-1);
+      //if uneven block splitting, we let the last block to have one more element
+      if(M % B > 0 && (blockNo==B)){
+        b=b+M%B;
+      }
+      blockNo+=1;
+
       if(beginSegment==0){
         mu_b=residues-((X.block(0,0,N,b)*beta.block(0,0,b,1)));
 
@@ -167,19 +193,19 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
 
     residues=mu_f;
     m0=(components.array()>0).count();
-    sigmaG=inv_scaled_chisq_rng(v0+m0,((beta.array()).pow(2).sum()+v0*s02)/(v0+m0));
-    sigmaE=inv_scaled_chisq_rng(v0+N,((((Y-residues).array()-mu).array().pow(2)).sum()+v0*s02)/(v0+N));
+    sigmaG=inv_scaled_chisq_rng(v0G+m0,((beta.array()).pow(2).sum()+v0G*s02G)/(v0G+m0));
+    sigmaE=inv_scaled_chisq_rng(v0E+N,((((Y-residues).array()-mu).array().pow(2)).sum()+v0E*s02E)/(v0E+N));
     v(0)=priorPi[0]+(components.array()==cVa[0]).count();
     v(1)=priorPi[1]+(components.array()==cVa[1]).count();
     v(2)=priorPi[2]+(components.array()==cVa[2]).count();
     v(3)=priorPi[3]+(components.array()==cVa[3]).count();
     pi=dirichilet_rng(v);
 
-    sum_beta_sqr(iteration)= ((beta.sparseView().cwiseProduct(beta).cwiseProduct(components.cwiseInverse())).sum()+v0*s02)/(m0+v0);
+    sum_beta_sqr(iteration)= (1.0/N)*mu_f.squaredNorm() - pow(mu_f.mean(),2);
       //buffer << iteration<<"\n";//<<"\t"<< mu <<"\t"<< beta.col(1).transpose()<<"\t"<< sigmaG <<"\t"<<sigmaE <<"\t"<< components.transpose()<< "\n";
       if(iteration >= burn_in)
       {
-        sample<< iteration,mu,beta,sigmaE,sigmaG,components;
+        sample<< iteration,mu,beta,sigmaE,sigmaG,components, sum_beta_sqr(iteration);
         q.enqueue(sample);
       }
 
@@ -195,9 +221,19 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
   bool queueFull;
   queueFull=0;
   std::ofstream outFile;
-  outFile.open("test.csv");
-  VectorXd sampleq(2*M+4);
+  outFile.open(outputFile);
+  VectorXd sampleq(2*M+5);
   IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
+  outFile<< "iteration,"<<"mu,";
+  for(unsigned int i = 0; i < M; ++i){
+   outFile << "beta[" << (i+1) << "],";
+
+  }
+  outFile<<"sigmaE,"<<"sigmaG,";
+  for(unsigned int i = 0; i < M; ++i){
+    outFile << "comp[" << (i+1) << "],";
+  }
+  outFile<<"EV\n";
   while(!flag ){
     if(q.try_dequeue(sampleq))
       outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
@@ -213,22 +249,26 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
 
 
 /*** R
-M=10000
-N=20000
+M=100
+N=2000
 B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-       BayesRSampler(1, 2000, 1000,1,X, Y,0.01,0.01,100)
-#        names(tmp)
- #       plot(tmp$sigmaG); mean(tmp$sigmaG)
-#        plot(B,colMeans(tmp$beta[900:1000,]))
- #       lines(B,B)
-#        abline(h=0)
- #        var(G)
- #       mean(tmp$sum_beta_sqr[900:1000])
-  #       1-var(G)
-   #      mean(tmp$sigmaE[900:1000])
+      Y=scale(Y)
+      X=scale(X)
+       BayesRSampler("test2.csv",1, 30000, 29000,1,X, Y,0.01,0.01,0.01,0.01,0.01,2)
+       library(readr)
+       tmp <- read_csv("~/repo/ctggroup/BayesRRcpp/src/test2.csv")
+        #names(tmp)
+        #plot(tmp$sigmaG); mean(tmp$sigmaG)
+       plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
+        lines(B,B)
+        abline(h=0)
+         var(G)
+        mean(tmp$EV)
+         1-var(G)
+         mean(tmp$sigmaE)
 
   */
 

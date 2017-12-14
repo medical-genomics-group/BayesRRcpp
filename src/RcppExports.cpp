@@ -45,22 +45,25 @@ BEGIN_RCPP
 END_RCPP
 }
 // BayesRSampler
-Rcpp::List BayesRSampler(int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double v0, double s02, int B);
-RcppExport SEXP _BayesRRcpp_BayesRSampler(SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP v0SEXP, SEXP s02SEXP, SEXP BSEXP) {
+void BayesRSampler(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double sigma0, double v0E, double s02E, double v0G, double s02G, int B);
+RcppExport SEXP _BayesRRcpp_BayesRSampler(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP sigma0SEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP v0GSEXP, SEXP s02GSEXP, SEXP BSEXP) {
 BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
     Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
     Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
     Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
     Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
     Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
     Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< double >::type v0(v0SEXP);
-    Rcpp::traits::input_parameter< double >::type s02(s02SEXP);
+    Rcpp::traits::input_parameter< double >::type sigma0(sigma0SEXP);
+    Rcpp::traits::input_parameter< double >::type v0E(v0ESEXP);
+    Rcpp::traits::input_parameter< double >::type s02E(s02ESEXP);
+    Rcpp::traits::input_parameter< double >::type v0G(v0GSEXP);
+    Rcpp::traits::input_parameter< double >::type s02G(s02GSEXP);
     Rcpp::traits::input_parameter< int >::type B(BSEXP);
-    rcpp_result_gen = Rcpp::wrap(BayesRSampler(seed, max_iterations, burn_in, thinning, X, Y, v0, s02, B));
-    return rcpp_result_gen;
+    BayesRSampler(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, B);
+    return R_NilValue;
 END_RCPP
 }
 // dirichilet_rng
@@ -204,7 +207,7 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_BayesRSamplerL", (DL_FUNC) &_BayesRRcpp_BayesRSamplerL, 10},
     {"_BayesRRcpp_BayesRSamplerM", (DL_FUNC) &_BayesRRcpp_BayesRSamplerM, 8},
-    {"_BayesRRcpp_BayesRSampler", (DL_FUNC) &_BayesRRcpp_BayesRSampler, 9},
+    {"_BayesRRcpp_BayesRSampler", (DL_FUNC) &_BayesRRcpp_BayesRSampler, 13},
     {"_BayesRRcpp_dirichilet_rng", (DL_FUNC) &_BayesRRcpp_dirichilet_rng, 1},
     {"_BayesRRcpp_inv_gamma_rng", (DL_FUNC) &_BayesRRcpp_inv_gamma_rng, 2},
     {"_BayesRRcpp_inv_scaled_chisq_rng", (DL_FUNC) &_BayesRRcpp_inv_scaled_chisq_rng, 2},
