@@ -6,6 +6,8 @@
 #include <random>
 #include "distributions.h"
 #include "MultVar.h"
+#include "concurrentqueue.h"
+
 
 
 // [[Rcpp::depends(RcppEigen)]]
@@ -59,15 +61,17 @@ struct categorical_init
 void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen::MatrixXd X, Eigen::VectorXd Y,double v0,double s02, int B) {
  int flag;
   std::stringstream buffer;
+  moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
   flag=0;
-  #pragma omp parallel num_threads(2) shared(flag,buffer)
+  int N(Y.size());
+  int M(X.cols());
+  #pragma omp parallel num_threads(2) shared(flag,q,M,N)
 {
     #pragma omp sections
     {
 
 {
-  int N(Y.size());
-  int M(X.cols());
+
   double mu;
   double sigmaG;
   double sigmaE;
@@ -94,7 +98,7 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
   MatrixXd mu_b(N,1);
   VectorXd ones(N);
   VectorXd mu_f(N);
-
+  VectorXd sample(2*M+4);
   int beginSegment;
   int endSegment;
   //std::ofstream file("test.txt");
@@ -102,12 +106,17 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
   //Eigen::setNbThreads(100);
 
   /////end of declarations//////
-
+  Eigen::initParallel();
+  Eigen::setNbThreads(5);
   ones.setOnes();
-  M=X.cols();
-  N=Y.rows();
+
   std::cout<<" computing XtX\n";
+  std::chrono::high_resolution_clock::time_point startt= std::chrono::high_resolution_clock::now();
   xtX=AtA(xM);
+  std::chrono::high_resolution_clock::time_point stopt= std::chrono::high_resolution_clock::now();
+  auto durationt = std::chrono::duration_cast<std::chrono::seconds>( startt - stopt ).count();
+  std::cout << "crossproduct was computed in: "<<durationt << "s\n";
+
   priorPi.setOnes();
   priorPi*=0.25;
   cVa[0] = 0;
@@ -127,10 +136,7 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
 
 
   std::cout<<"block size " << b <<"\n";
-  Eigen::initParallel();
-  Eigen::setNbThreads(10);
   std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-
   residues= X*beta;
 
   for(int iteration=0; iteration < max_iterations; iteration++){
@@ -170,9 +176,12 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
     pi=dirichilet_rng(v);
 
     sum_beta_sqr(iteration)= ((beta.sparseView().cwiseProduct(beta).cwiseProduct(components.cwiseInverse())).sum()+v0*s02)/(m0+v0);
-    if(iteration >= burn_in)
-      buffer << iteration <<"\t"<< mu <<"\t"<< beta.col(1).transpose()<<"\t"<< sigmaG <<"\t"<<sigmaE <<"\t"<< components.transpose()<<  "\n";
-    //buff<<"sigma\n" ;
+      //buffer << iteration<<"\n";//<<"\t"<< mu <<"\t"<< beta.col(1).transpose()<<"\t"<< sigmaG <<"\t"<<sigmaE <<"\t"<< components.transpose()<< "\n";
+      if(iteration >= burn_in)
+      {
+        sample<< iteration,mu,beta,sigmaE,sigmaG,components;
+        q.enqueue(sample);
+      }
 
   }
 
@@ -183,24 +192,25 @@ void BayesRSampler(int seed, int max_iterations, int burn_in,int thinning,Eigen:
 }
 #pragma omp section
 {
+  bool queueFull;
+  queueFull=0;
   std::ofstream outFile;
-  outFile.open("test.txt");
-  while(!flag){
-    #pragma omp critical
-    outFile<< buffer.str();
+  outFile.open("test.csv");
+  VectorXd sampleq(2*M+4);
+  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
+  while(!flag ){
+    if(q.try_dequeue(sampleq))
+      outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
   }
-  outFile.close();
-  buffer.str(std::string());
+//
 }
 
     }
 }
 
 }
-// You can include R code blocks in C++ files processed with sourceCpp
-// (useful for testing and development). The R code will be automatically
-// run after the compilation.
-//
+//TODO: Why once I call BayesRsampler again after sourced, it doesnt write the file?
+
 
 /*** R
 M=10000
@@ -209,7 +219,7 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-       BayesRSampler(1, 200, 100,1,X, Y,0.01,0.01,1000)
+       BayesRSampler(1, 2000, 1000,1,X, Y,0.01,0.01,100)
 #        names(tmp)
  #       plot(tmp$sigmaG); mean(tmp$sigmaG)
 #        plot(B,colMeans(tmp$beta[900:1000,]))
