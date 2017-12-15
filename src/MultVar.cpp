@@ -1,4 +1,7 @@
 /**
+ *Code modified by Daniel Trejo Baños for allowing conditional draws from a multivariate normal (completing the square). Below the original comments and license
+ *
+ *
  * Multivariate Normal distribution sampling using C++11 and Eigen matrices.
  *
  * This is an extension of the multivariate normal simulation used in https://github.com/beniz/eigenmvn
