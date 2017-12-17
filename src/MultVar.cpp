@@ -52,15 +52,6 @@ using namespace RcppEigen;
 using Eigen::Matrix;
 using Eigen::MatrixXd;                  // variable size matrix, double precision
 
-// This is a simple example of exporting a C++ function to R. You can
-// source this function into an R session using the Rcpp::sourceCpp
-// function (or via the Source button on the editor toolbar). Learn
-// more about Rcpp at:
-//
-//   http://www.rcpp.org/
-//   http://adv-r.had.co.nz/Rcpp.html
-//   http://gallery.rcpp.org/
-//
 // [[Rcpp::export]]
 Eigen::MatrixXd sumDiagonal(Eigen::MatrixXd Ma,Eigen::VectorXd va)
 {
@@ -224,49 +215,9 @@ public:
   /// as columns in a Dynamic by nn matrix
   Matrix<Scalar,Dynamic,Dynamic> samples(int nn)
   {
-    //TODO verify if I have to solve the linear system instead
     return  _transform.solve( Matrix<Scalar,Dynamic,-1>::NullaryExpr(_covar.rows(),1,randN))+_transform.solve(_mean);
   }
 };
-// end class EigenMultivariateNormalCoef
-template<typename Scalar>
-class EigenMultivariateNormalCoefAug
-{
-  Eigen::Matrix<Scalar,Dynamic,Dynamic> _covar;
-  Eigen::Matrix< Scalar, Dynamic, 1> _mean;
-  internal::scalar_normal_dist_op<Scalar> randN; // Gaussian functor
-  bool _use_cholesky;
-  SelfAdjointEigenSolver<Matrix<Scalar,Dynamic,Dynamic> > _eigenSolver; // drawback: this creates a useless eigenSolver when using Cholesky decomposition, but it yields access to eigenvalues and vectors
-
-public:
-
-  EigenMultivariateNormalCoefAug(const Matrix<Scalar,Dynamic,1>& y,const Matrix<Scalar,Dynamic,Dynamic>& x,const VectorXd d,
-                              const bool use_cholesky=false,const uint64_t &seed=std::mt19937::default_seed)
-    :_use_cholesky(use_cholesky)
-  {
-    randN.seed(seed);
-    setCovar(y,x,d);
-    setMean(y);
-  }
-
-  void setMean(const Matrix<Scalar,Dynamic,1>& y) { _mean = y; }
-  void setCovar(const Matrix<Scalar,Dynamic,1>& y,const Matrix<Scalar,Dynamic,Dynamic>& x,const VectorXd d)
-  {
-     Matrix<Scalar,Dynamic,Dynamic> u;
-     u=(d.array()*Matrix<Scalar,Dynamic,-1>::NullaryExpr(d.rows(),1,randN).array()).matrix();
-    _covar =u + d.asDiagonal()*x.transpose()*(sumIdentity(x*d.asDiagonal()*x.transpose())).lu().solve( y-x*u-(Matrix<Scalar,Dynamic,-1>::NullaryExpr(x.rows(),1,randN)).matrix());
-  }
-
-  /// Draw nn samples from the gaussian and return them
-  /// as columns in a Dynamic by nn matrix
-  Matrix<Scalar,Dynamic,Dynamic> samples(int nn)
-  {
-    //TODO verify if I have to solve the linear system instead
-    return  _covar;
-  }
-};
-// end class EigenMultivariateNormalAug
-
 
 } // end namespace Eigen
 // [[Rcpp::export]]
@@ -281,18 +232,7 @@ Eigen::MatrixXd mvnCoef_rng(int nn,const Eigen::MatrixXd xty,const Eigen::Matrix
   Eigen::EigenMultivariateNormalCoef<double> normX_cholesk(xty,xtx,d, true);
   return normX_cholesk.samples(nn);
 }
-// [[Rcpp::export]]
-Eigen::MatrixXd mvnCoef_rngAug(int nn,const Eigen::MatrixXd y,const Eigen::MatrixXd x,const  Eigen::VectorXd d)
-{
-  Eigen::EigenMultivariateNormalCoefAug<double> normX_cholesk(y,x,d, true);
-  return normX_cholesk.samples(nn);
-}
-//sum diagonal matrix to a matrix
 
-// You can include R code blocks in C++ files processed with sourceCpp
-// (useful for testing and development). The R code will be automatically
-// run after the compilation.
-//
 
 
 /*** R

@@ -13,6 +13,10 @@ BayesRSampler <- function(outputFile, seed, max_iterations, burn_in, thinning, X
     invisible(.Call(`_BayesRRcpp_BayesRSampler`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, B))
 }
 
+BayesRSamplerChol <- function(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, B) {
+    invisible(.Call(`_BayesRRcpp_BayesRSamplerChol`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, B))
+}
+
 dirichilet_rng <- function(alpha) {
     .Call(`_BayesRRcpp_dirichilet_rng`, alpha)
 }
@@ -47,10 +51,6 @@ mvn_rng <- function(nn, mean, covar) {
 
 mvnCoef_rng <- function(nn, xty, xtx, d) {
     .Call(`_BayesRRcpp_mvnCoef_rng`, nn, xty, xtx, d)
-}
-
-mvnCoef_rngAug <- function(nn, y, x, d) {
-    .Call(`_BayesRRcpp_mvnCoef_rngAug`, nn, y, x, d)
 }
 
 slicingTest <- function(M, B) {
