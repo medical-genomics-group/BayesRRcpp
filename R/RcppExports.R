@@ -53,7 +53,3 @@ mvnCoef_rng <- function(nn, xty, xtx, d) {
     .Call(`_BayesRRcpp_mvnCoef_rng`, nn, xty, xtx, d)
 }
 
-slicingTest <- function(M, B) {
-    invisible(.Call(`_BayesRRcpp_slicingTest`, M, B))
-}
-
