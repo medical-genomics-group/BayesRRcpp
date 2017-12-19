@@ -175,7 +175,7 @@ void BayesRSamplerChol(std::string outputFile, int seed, int max_iterations, int
 
       residues=X*beta;
       m0=(components.array()>0).count();
-      sigmaG=inv_scaled_chisq_rng(v0G+m0,((beta.array()).pow(2).sum()+v0G*s02G)/(v0G+m0));
+      sigmaG=inv_scaled_chisq_rng(v0G+m0,((beta.array()).pow(2).sum()*m0+v0G*s02G)/(v0G+m0));
       sigmaE=inv_scaled_chisq_rng(v0E+N,((((Y-residues).array()-mu).array().pow(2)).sum()+v0E*s02E)/(v0E+N));
       v(0)=priorPi[0]+(components.array()==cVa[0]).count();
       v(1)=priorPi[1]+(components.array()==cVa[1]).count();
