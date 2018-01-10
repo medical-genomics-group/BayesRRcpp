@@ -60,11 +60,39 @@ inline MatrixXd AtA(const MapMatd& A) {
 template<typename Scalar>
 struct inv_gamma_functor
 {
-  inv_gamma_functor(){}
+  inv_gamma_functor(const Scalar& vd):m_a(vd){}
 
-  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rng(1.0,1.0/x); }
+  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rate_rng(0.5 + 0.5*m_a,x); }
+  Scalar  m_a;
+};
+
+template<typename Scalar>
+struct gamma_functor
+{
+  inv_gamma_functor(const Scalar& vd):m_a(vd){}
+
+  const Scalar operator()(const Scalar& x) const{ return gamma_rate_rng(0.5 + 0.5*m_a,x); }
+  Scalar  m_a;
+};
+
+template<typename Scalar>
+struct inv_gamma_functor_init
+{
+  inv_gamma_functor_init(){}
+
+  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rate_rng(0.5,x); }
 
 };
+
+template<typename Scalar>
+struct inv_gamma_functor_init_v
+{
+  inv_gamma_functor_init_v(const Scalar& vd):m_a(vd){}
+
+  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rate_rng(0.5*m_a,m_a*x); }
+  Scalar  m_a;
+};
+
 
 //Functor to perform a elementwise draw from a conditional categorical distribution with vector of probabilities pi, coefficient beta and variance sigma
 template<typename Scalar>
@@ -103,7 +131,7 @@ struct categorical_init
 * B- integer lower than number of columns of X, number of blocks in which the effects beta will be conditiionally divided as p(beta_B|beta_\B,.)
 */
 // [[Rcpp::export]]
-void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G, int B) {
+void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double A, double v0E, double s02E, double vL, double vT, int B) {
   int flag;
   moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
   flag=0;
@@ -125,7 +153,7 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
     std::cout<<"error: burn_in has to be a positive integer and smaller than the maximum number of iterations ";
     return;
   }
-  if(sigma0 < 0 || v0E < 0 || s02E < 0 || v0G < 0||  s02G < 0 )//validations related to hyperparameters
+  if(A < 0 || v0E < 0 || s02E < 0 || vL < 0||  vT < 0 )//validations related to hyperparameters
   {
     std::cout<<"error: hyper parameters have to be positive";
     return;
@@ -175,15 +203,20 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
 
 
-    //beta.setRandom();
     beta=(xtX).colPivHouseholderQr().solve(X.transpose()*Y);
     mu=norm_rng(0,1);
-    sigmaE=std::abs(norm_rng(0,1));
-    eta=inv_gamma_rng(0.5,1/pow(sigma0,2));
-    tau=std::abs(norm_rng(0,1));
-    lambda=lambda.setRandom().cwiseAbs();
-    v=0.0001*v.setRandom().cwiseAbs();
-    // residues=Y-mu*ones;
+    sigmaE=inv_scaled_chisq_rng(v0E,s02E);
+    std::cout<< "initial SigmaE " << sigmaE<<"\n";
+    eta=inv_gamma_rate_rng(0.5,1/pow(A,2));
+    std::cout<< "initial eta " << eta<<"\n";
+    tau=inv_gamma_rate_rng(0.5*vT,vT/eta);
+    //tau=A;
+    std::cout<< "initial tau " << tau<<"\n";
+    v=10000*v.setOnes().unaryExpr(inv_gamma_functor_init<double>());
+    //std::cout<< "initial v" << eta;
+    lambda=v.cwiseInverse().unaryExpr(inv_gamma_functor_init_v<double>(vL));
+    //std::cout<< "initial lambda" << lambda;
+
 
 
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
@@ -192,17 +225,10 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
     for(int iteration=0; iteration < max_iterations; iteration++){
    //   std::cout <<beta.col(0) <<"\n";
       std::cout << "iteration: "<<iteration <<"\n";
-   //   mu = norm_rng(1.0/(1.0/sigma0+(double)N/sigmaE)*(Y-residues).sum(), 1.0/(1.0/sigma0+(double)N/sigmaE));
+      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)/(tau))).unaryExpr(inv_gamma_functor<double>(vL));
 
-
-
-      //lambda=(v.cwiseInverse()+((0.5/(tau*sigmaE))*beta.cwiseProduct(beta))).unaryExpr(inv_gamma_functor<double>());
-      lambda=(v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)/tau)).unaryExpr(inv_gamma_functor<double>());
-
-
-
-      tau= inv_gamma_rng(0.5*(M+1.0),1.0/(1.0/eta+((0.5)*(beta.array().pow(2)/lambda.array()).sum())));
-      tau=sigma0;
+      tau= inv_gamma_rate_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum()));
+      std::cout <<"tau" << tau<<"\n";
 
       blockNo=1;
       b=M/B;
@@ -232,29 +258,17 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
         beta.block(beginSegment,0,b,1)= mvnCoef_rng(1,
                    X.block(0,beginSegment,N,b).transpose()*(Y-mu_b-mu_f),
-                   xtX.block(beginSegment,beginSegment,b,b),
-                   temp.segment(beginSegment,b)*sigmaE,sigmaE); //check which one is the correct expression (substitute 1.0 with sigmaE)
+                   xtX.block(beginSegment,beginSegment,b,b)/sigmaE,
+                   temp.segment(beginSegment,b),1.0); //check which one is the correct expression (substitute 1.0 with sigmaE)
 
-        // beta.block(beginSegment,0,b,1) = (components.block(beginSegment,0,b,1).array() > 1e-10 ).select(beta.block(beginSegment,0,b,1), MatrixXd::Zero(b,1));
         mu_f+=X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1);
       }
 
 
       residues=mu_f;
-      eta = inv_gamma_rng(1,1.0/(1.0/(pow(sigma0,2))+1.0/tau));
-
-      v=((lambda.cwiseInverse()).array()+1.0).unaryExpr(inv_gamma_functor<double>());
-      //double temp=(Y.transpose()*( MatrixXd::Identity(N, N)-tau*X.transpose()*lambda.asDiagonal()*X)*Y);
-      //sigmaE=inv_gamma_rng(N/2.0,temp/2.0);
-
-      //std::cout <<beta.col(0) <<"\n";
-      //sigmaE=inv_gamma_rng((N+M)*0.5,(Y-residues).squaredNorm()*0.5 + (beta.cwiseProduct(beta).cwiseProduct(temp)).sum()* 0.5);
+      eta = inv_gamma_rate_rng(0.5+0.5*vT,(1.0/(pow(A,2))+vT/tau));
+      v=(vL/(lambda).array()+1.0).unaryExpr(inv_gamma_functor<double>(vL));
       sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
-
-      double term;
-
-      //sigmaE=inv_gamma_rng(N*0.5, 0.5*Y.squaredNorm() - 0.5*term);
-      //std::cout << 0.5*(((Y.transpose()*X).cwiseProduct(Y.transpose()*X)).cwiseProduct(temp).sum())<<"\n";
       std::cout << sigmaE<<"\n";
       sum_beta_sqr= (1.0/N)*residues.squaredNorm() - pow(residues.mean(),2);
       if(iteration >= burn_in)
@@ -302,20 +316,17 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
 
 /*** R
-M=2000
+M=3000
 N=2000
 B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
-#B[sample(1:2000,1000),1]=0#we randomly set 30 effects to zero
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
         Y=scale(Y)
         X=scale(X)
-       HorseshoeP("./test2.csv",1, 3000,2000 ,1000,X, Y,1,N,0.5,0.01,0.01,2)
+       HorseshoeP("./test2.csv",1, 300,1 ,1000,X, Y,1,N,0.5,100,3,2)
         library(readr)
         tmp <- read_csv("./test2.csv")
-#names(tmp)
-#plot(tmp$sigmaG); mean(tmp$sigmaG)
         plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
         lines(B,B)
         abline(h=0)
