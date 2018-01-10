@@ -69,7 +69,7 @@ struct inv_gamma_functor
 template<typename Scalar>
 struct gamma_functor
 {
-  inv_gamma_functor(const Scalar& vd):m_a(vd){}
+  gamma_functor(const Scalar& vd):m_a(vd){}
 
   const Scalar operator()(const Scalar& x) const{ return gamma_rate_rng(0.5 + 0.5*m_a,x); }
   Scalar  m_a;
@@ -207,14 +207,15 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
     mu=norm_rng(0,1);
     sigmaE=inv_scaled_chisq_rng(v0E,s02E);
     std::cout<< "initial SigmaE " << sigmaE<<"\n";
-    eta=inv_gamma_rate_rng(0.5,1/pow(A,2));
+    eta=1/inv_gamma_rate_rng(0.5,1/pow(A,2));
     std::cout<< "initial eta " << eta<<"\n";
-    tau=inv_gamma_rate_rng(0.5*vT,vT/eta);
-    //tau=A;
+    tau=1/inv_gamma_rate_rng(0.5*vT,vT*eta);
+
+    tau=1/A;
     std::cout<< "initial tau " << tau<<"\n";
-    v=10000*v.setOnes().unaryExpr(inv_gamma_functor_init<double>());
+    v=v.setOnes().unaryExpr(inv_gamma_functor_init<double>()).cwiseInverse();
     //std::cout<< "initial v" << eta;
-    lambda=v.cwiseInverse().unaryExpr(inv_gamma_functor_init_v<double>(vL));
+    lambda=v.unaryExpr(inv_gamma_functor_init_v<double>(vL)).cwiseInverse();
     //std::cout<< "initial lambda" << lambda;
 
 
@@ -225,16 +226,17 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
     for(int iteration=0; iteration < max_iterations; iteration++){
    //   std::cout <<beta.col(0) <<"\n";
       std::cout << "iteration: "<<iteration <<"\n";
-      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)/(tau))).unaryExpr(inv_gamma_functor<double>(vL));
+      lambda=(vL*v+(0.5*beta.cwiseProduct(beta)*(tau))).unaryExpr(gamma_functor<double>(vL));
 
-      tau= inv_gamma_rate_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum()));
+      tau= gamma_rate_rng(0.5*(M+vT),vT*eta+((0.5)*((beta.array().pow(2))*lambda.array()).sum()));
+      tau=1/A;
       std::cout <<"tau" << tau<<"\n";
 
       blockNo=1;
       b=M/B;
 
       VectorXd temp(M);
-      temp=(lambda*tau).cwiseInverse();
+      temp=(lambda*tau);
 
       for(int block=0; block < M;block+=b){
 
@@ -258,16 +260,16 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
         beta.block(beginSegment,0,b,1)= mvnCoef_rng(1,
                    X.block(0,beginSegment,N,b).transpose()*(Y-mu_b-mu_f),
-                   xtX.block(beginSegment,beginSegment,b,b)/sigmaE,
-                   temp.segment(beginSegment,b),1.0); //check which one is the correct expression (substitute 1.0 with sigmaE)
+                   xtX.block(beginSegment,beginSegment,b,b),
+                   temp.segment(beginSegment,b)*sigmaE,sigmaE); //check which one is the correct expression (substitute 1.0 with sigmaE)
 
         mu_f+=X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1);
       }
 
 
       residues=mu_f;
-      eta = inv_gamma_rate_rng(0.5+0.5*vT,(1.0/(pow(A,2))+vT/tau));
-      v=(vL/(lambda).array()+1.0).unaryExpr(inv_gamma_functor<double>(vL));
+      eta = gamma_rate_rng(0.5+0.5*vT,(1.0/(pow(A,2))+vT*tau));
+      v=(vL*(lambda).array()+1.0).unaryExpr(gamma_functor<double>(vL));
       sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
       std::cout << sigmaE<<"\n";
       sum_beta_sqr= (1.0/N)*residues.squaredNorm() - pow(residues.mean(),2);
@@ -316,7 +318,7 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
 
 /*** R
-M=3000
+M=2000
 N=2000
 B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
@@ -324,7 +326,7 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
         Y=scale(Y)
         X=scale(X)
-       HorseshoeP("./test2.csv",1, 300,1 ,1000,X, Y,1,N,0.5,100,3,2)
+       HorseshoeP("./test2.csv",1, 400,300 ,1000,X, Y,1000,N,0.48,30,30,2)
         library(readr)
         tmp <- read_csv("./test2.csv")
         plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
@@ -343,6 +345,10 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
 
         plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
         lines(B,B)
+        plot(tmp$sigmaE)
+        plot(tmp$`beta[1]`)
+
+
 
         */
 

@@ -9,6 +9,8 @@
 Eigen::VectorXd dirichilet_rng(Eigen::VectorXd alpha);
 double inv_gamma_rng(double shape,double scale);
 double gamma_rng(double shape,double scale);
+double inv_gamma_rate_rng(double shape,double rate);
+double gamma_rate_rng(double shape,double rate);
 double inv_scaled_chisq_rng(double dof,double scale);
 double norm_rng(double mu, double sigma2);
 double component_probs(double b,Eigen::VectorXd pi);

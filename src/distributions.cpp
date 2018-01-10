@@ -35,7 +35,14 @@ double inv_gamma_rng(double shape,double scale){
 double gamma_rng(double shape,double scale){
   return R::rgamma(shape, scale);
 }
-
+// [[Rcpp::export]]
+double inv_gamma_rate_rng(double shape,double rate){
+  return 1.0 / R::rgamma(shape, rate);
+}
+// [[Rcpp::export]]
+double gamma_rate_rng(double shape,double rate){
+  return R::rgamma(shape, 1.0/rate);
+}
 
 // [[Rcpp::export]]
 double inv_scaled_chisq_rng(double dof,double scale){
