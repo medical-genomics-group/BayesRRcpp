@@ -166,19 +166,21 @@ class EigenMultivariateNormalCoef
   internal::scalar_normal_dist_op<Scalar> randN; // Gaussian functor
   bool _use_cholesky;
   SelfAdjointEigenSolver<Matrix<Scalar,Dynamic,Dynamic> > _eigenSolver; // drawback: this creates a useless eigenSolver when using Cholesky decomposition, but it yields access to eigenvalues and vectors
-
+   double _sigma;
 public:
 
-  EigenMultivariateNormalCoef(const Matrix<Scalar,Dynamic,1>& xty,const Matrix<Scalar,Dynamic,Dynamic>& xtx,const VectorXd d,
+  EigenMultivariateNormalCoef(const Matrix<Scalar,Dynamic,1>& xty,const Matrix<Scalar,Dynamic,Dynamic>& xtx,const VectorXd d,const double sigma,
                           const bool use_cholesky=false,const uint64_t &seed=std::mt19937::default_seed)
     :_use_cholesky(use_cholesky)
   {
     randN.seed(seed);
     setCovar(xtx,d);
     setMean(xty);
+    set_sigma(sigma);
   }
 
   void setMean(const Matrix<Scalar,Dynamic,1>& xty) { _mean = xty; }
+  void set_sigma(const double sigma) { _sigma = sigma; }
   void setCovar(const Matrix<Scalar,Dynamic,Dynamic>& xtx,const VectorXd d)
   {
     _covar =sumDiagonal(xtx,d);
@@ -215,7 +217,7 @@ public:
   /// as columns in a Dynamic by nn matrix
   Matrix<Scalar,Dynamic,Dynamic> samples(int nn)
   {
-    return  _transform.solve( Matrix<Scalar,Dynamic,-1>::NullaryExpr(_covar.rows(),1,randN))+_transform.solve(_mean);
+    return  _transform.solve( Matrix<Scalar,Dynamic,-1>::NullaryExpr(_covar.rows(),1,randN))*_sigma+_transform.solve(_mean);
   }
 };
 
@@ -227,9 +229,9 @@ Eigen::MatrixXd mvn_rng(int nn,const Eigen::MatrixXd mean,const Eigen::MatrixXd 
   return normX_cholesk.samples(nn);
 }
 // [[Rcpp::export]]
-Eigen::MatrixXd mvnCoef_rng(int nn,const Eigen::MatrixXd xty,const Eigen::MatrixXd xtx,const  Eigen::VectorXd d)
+Eigen::MatrixXd mvnCoef_rng(int nn,const Eigen::MatrixXd xty,const Eigen::MatrixXd xtx,const  Eigen::VectorXd d,double sigma)
 {
-  Eigen::EigenMultivariateNormalCoef<double> normX_cholesk(xty,xtx,d, true);
+  Eigen::EigenMultivariateNormalCoef<double> normX_cholesk(xty,xtx,d, sigma,true);
   return normX_cholesk.samples(nn);
 }
 

@@ -62,7 +62,7 @@ struct inv_gamma_functor
 {
   inv_gamma_functor(){}
 
-  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rng(1.0,x); }
+  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rng(1.0,1.0/x); }
 
 };
 
@@ -179,10 +179,10 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
     beta=(xtX).colPivHouseholderQr().solve(X.transpose()*Y);
     mu=norm_rng(0,1);
     sigmaE=std::abs(norm_rng(0,1));
-    eta=0.00001*std::abs(norm_rng(0,1));
+    eta=inv_gamma_rng(0.5,1/pow(sigma0,2));
     tau=std::abs(norm_rng(0,1));
     lambda=lambda.setRandom().cwiseAbs();
-    v=v.setRandom().cwiseAbs();
+    v=0.0001*v.setRandom().cwiseAbs();
     // residues=Y-mu*ones;
 
 
@@ -197,11 +197,11 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
 
       //lambda=(v.cwiseInverse()+((0.5/(tau*sigmaE))*beta.cwiseProduct(beta))).unaryExpr(inv_gamma_functor<double>());
-      lambda=(v.cwiseInverse()+((0.5/(tau))*beta.cwiseProduct(beta))).unaryExpr(inv_gamma_functor<double>());
+      lambda=(v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)/tau)).unaryExpr(inv_gamma_functor<double>());
 
 
 
-      tau= inv_gamma_rng(0.5*(M+1.0),1.0/eta+((0.5/sigmaE)*((lambda.cwiseInverse()).cwiseProduct(beta.cwiseProduct(beta))).sum()));
+      tau= inv_gamma_rng(0.5*(M+1.0),1.0/(1.0/eta+((0.5)*(beta.array().pow(2)/lambda.array()).sum())));
       tau=sigma0;
 
       blockNo=1;
@@ -241,7 +241,7 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
 
       residues=mu_f;
-      eta = inv_gamma_rng(1,1.0+1.0/tau);
+      eta = inv_gamma_rng(1,1.0/(1.0/(pow(sigma0,2))+1.0/tau));
 
       v=((lambda.cwiseInverse()).array()+1.0).unaryExpr(inv_gamma_functor<double>());
       //double temp=(Y.transpose()*( MatrixXd::Identity(N, N)-tau*X.transpose()*lambda.asDiagonal()*X)*Y);
@@ -252,7 +252,7 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
       sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
 
       double term;
-      term= Y.transpose()*X*temp.asDiagonal()*X.transpose()*Y;
+
       //sigmaE=inv_gamma_rng(N*0.5, 0.5*Y.squaredNorm() - 0.5*term);
       //std::cout << 0.5*(((Y.transpose()*X).cwiseProduct(Y.transpose()*X)).cwiseProduct(temp).sum())<<"\n";
       std::cout << sigmaE<<"\n";
@@ -305,12 +305,13 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 M=2000
 N=2000
 B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
+#B[sample(1:2000,1000),1]=0#we randomly set 30 effects to zero
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
-      Y=X%*%B+rnorm(N,sd=0.001); var(Y)
+      Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
         Y=scale(Y)
         X=scale(X)
-       HorseshoeP("./test2.csv",1, 000,500 ,1000,X, Y,0.0001,0.01,0.01,0.01,0.01,100)
+       HorseshoeP("./test2.csv",1, 3000,2000 ,1000,X, Y,1,N,0.5,0.01,0.01,2)
         library(readr)
         tmp <- read_csv("./test2.csv")
 #names(tmp)

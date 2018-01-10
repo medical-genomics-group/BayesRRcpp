@@ -29,8 +29,14 @@ Eigen::VectorXd dirichilet_rng(Eigen::VectorXd alpha) {
 }
 // [[Rcpp::export]]
 double inv_gamma_rng(double shape,double scale){
-  return (1.0 / R::rgamma(shape, 1.0 / scale));
+  return (1.0 / R::rgamma(shape, 1.0/scale));
 }
+// [[Rcpp::export]]
+double gamma_rng(double shape,double scale){
+  return R::rgamma(shape, scale);
+}
+
+
 // [[Rcpp::export]]
 double inv_scaled_chisq_rng(double dof,double scale){
   return inv_gamma_rng(0.5*dof, 0.5*dof*scale);
@@ -40,63 +46,35 @@ double norm_rng(double mean,double sigma2){
   return R::rnorm(mean,std::sqrt((double)sigma2));
 }
 // [[Rcpp::export]]
-double component_probs(double b,Eigen::VectorXd pi,double sigmaG){
+double component_probs(double b2,Eigen::VectorXd pi){
   double sum;
   double p;
-  double b2;
   p=R::runif(0,1);
-  b2=b*b;
-  sum= ((std::abs(b)==0)?1:0)*pi[0]+pi[1]*(1.0/sqrt(0.0001))*exp((-0.5*b2)/(0.0001*sigmaG)) +pi[2]*(1.0/sqrt(0.001))*exp((-0.5*b2)/(0.001*sigmaG))+pi[3]*(1.0/sqrt(0.01))*exp((-0.5*b2)/(0.01*sigmaG));
-  //not pretty but will save space if done concurrently, binary search
-  if(p<=((std::abs(b)==0)?1:0)*pi[0]/sum+pi[1]*(1.0/sqrt(0.0001))*exp((-0.5*b2)/(0.0001*sigmaG))/sum){
-    if(p<=((std::abs(b)==0)?1:0)*pi[0]/sum)
-      return 0;
-    else
-      return 0.0001;
-  }
+  sum= pi[0]*exp((-0.5*b2)/(5e-2))/sqrt(5e-2)+pi[1]*exp((-0.5*b2));
+  if(p<=(pi[0]*exp((-0.5*b2)/(5e-2))/sqrt(5e-2))/sum)
+    return 5e-2;
   else
-  {
-    if(p<=((std::abs(b)==0)?1:0)*pi[0]/sum+pi[1]*(1.0/sqrt(0.0001))*exp((-0.5*b2)/(0.0001*sigmaG))/sum+pi[2]*(1.0/sqrt(0.001))*exp((-0.5*b2)/(0.001*sigmaG))/sum)
-      return 0.001;
-    else
-      return  0.01;
-  }
+    return 1;
 }
 
 double categorical(Eigen::VectorXd probs){
   double p;
 
   p=R::runif(0,1);
-  if(p<= probs[0]+probs[1]){
-    if(p<=probs[0])
-      return 0;
-    else
-      return 0.0001;
+  if(p<= probs[0]/(probs[0]+probs[1]))
+    return 5e-2;
+  else
+    return 1;
 
-  }
-  else{
-    if(p<=probs[2])
-      return 0.001;
-    else
-      return 0.01;
-  }
+
 
 }
 
 double beta_rng(double a,double b){
   return R::rbeta(a,b);
 }
-// [[Rcpp::export]]
-double spike_slab_rng(double w,double lambda,double sigmaS){
-   double p;
-   double sum;
-   double lk1;
-   double lk0;
-   double prob;
-   p=R::runif(0,1);
-   lk1= log(w)-0.5*lambda*lambda/sigmaS;
-   lk0= (lambda<=1e-10?1:0)*log(1-w);
-   prob=1/(exp(lk1-lk0));
+double exp_rng(double a){
+  return R::rexp(a);
 }
 // You can include R code blocks in C++ files processed with sourceCpp
 // (useful for testing and development). The R code will be automatically
