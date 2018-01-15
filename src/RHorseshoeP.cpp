@@ -306,23 +306,28 @@ void RHorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_
 
 
 /*** R
-M=200
-N=2000
-MT=2000
-B=matrix(rnorm(MT,sd=sqrt(0.5/M)),ncol=1)
-B[sample(1:MT,MT-M),1]=0
+##regularised horseshoe example
+M=200 #non zero marker effects
+N=2000 #observations
+MT=2000 #number of markers
+B=matrix(rnorm(MT,sd=sqrt(0.5/M)),ncol=1) #marker effects, M marquers explain approx 50% of the variance
+B[sample(1:MT,MT-M),1]=0 #we set MT-M marker effects to zero
   X <- matrix(rnorm(MT*N), N, MT); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
         Y=scale(Y)
         X=scale(X)
-      vT=3
-    vL=1
+      vT=3 # degrees of freedom global variable, currently doesnt takte effect
+    vL=1 # degrees of freedom local variables, 1 is equivalent to a cauchy prior
 
-    vC=3
-    sC=0.2
-    A=0.001
-    RHorseshoeP("./test2.csv",1, 10000,9000 ,0.01,X, Y,A,N,0.5,vL,vT,10,vC,sC)
+    vC=3 #degrees of freedom regularising parameter, currently doesnt take effect
+    sC=0.2 #prior scale of regularising parameter, currently it IS the value of the regularising parameter
+    A=0.001 #prior scale over the global shrinkage parameter, currently, it IS the regularising parameter
+    B=10 # number of blocks marker effects are partitioned, more blocks means quicker inference but more autocorrelation between parameters
+    s02E=0.5 #prior scale of the residuals variance
+    v0E=N #degrees of freedom of prior over residuals variance
+
+    RHorseshoeP("./test2.csv",1, 10000,9000 ,0.01,X, Y,A,v0E,s02E,vL,vT,B,vC,sC)
       library(readr)
       tmp <- read_csv("./test2.csv")
       plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
