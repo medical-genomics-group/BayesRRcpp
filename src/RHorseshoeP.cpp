@@ -62,7 +62,7 @@ struct inv_gamma_functor
 {
   inv_gamma_functor(const Scalar& vd):m_a(vd){}
 
-  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rate_rng(0.5 + 0.5*m_a,x); }
+  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rng(0.5 + 0.5*m_a,x); }
   Scalar  m_a;
 };
 
@@ -80,7 +80,7 @@ struct inv_gamma_functor_init
 {
   inv_gamma_functor_init(){}
 
-  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rate_rng(0.5,x); }
+  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rng(0.5,x); }
 
 };
 
@@ -187,10 +187,10 @@ void RHorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_
     mu=norm_rng(0,1);
     sigmaE=inv_scaled_chisq_rng(v0E,s02E);
     std::cout<< "initial SigmaE " << sigmaE<<"\n";
-    eta=inv_gamma_rate_rng(0.5,1/pow(A,2));
+    eta=inv_gamma_rng(0.5,1/pow(A,2));
     std::cout<< "initial eta " << eta<<"\n";
-    tau=inv_gamma_rate_rng(0.5*vT,vT/eta);
-     c2=inv_gamma_rate_rng(0.5*vC,vC*sC*0.5);
+    tau=inv_gamma_rng(0.5*vT,vT/eta);
+     c2=inv_gamma_rng(0.5*vC,vC*sC*0.5);
   //  tau=A;
     std::cout<< "initial tau " << tau<<"\n";
     v=v.setOnes().unaryExpr(inv_gamma_functor_init<double>());
@@ -216,7 +216,7 @@ void RHorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_
       mu_f.setZero();
 
       VectorXd temp(M);
-      temp=(tau*lambda.array()+c2).cwiseInverse();
+      temp=((tau*c2*lambda.array()).cwiseQuotient(tau*lambda.array()+c2)).cwiseInverse();
 
       for(int block=0; block < M;block+=b){
 
@@ -248,12 +248,12 @@ void RHorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_
 
 
       residues=mu_f;
-      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(tau))).unaryExpr(gamma_functor<double>(vL));
+      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/tau))).unaryExpr(inv_gamma_functor<double>(vL));
       tau= inv_gamma_rate_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum()));
-      //tau=A;
+      tau=A;
       c2=inv_gamma_rate_rng(0.5*vC+0.5*M,vC*sC*0.5+0.5*beta.squaredNorm());
-      //c2=sC;
-      eta = inv_gamma_rate_rng(0.5+0.5*vT,(1.0/(A*A*sigmaE))+vT/tau);
+      c2=sC;
+      eta = inv_gamma_rate_rng(0.5+0.5*vT,(sigmaE/(A*A))+vT/tau);
       v=(vL/(lambda).array()+1.0).unaryExpr(inv_gamma_functor<double>(vL));
       sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
       // sigmaE=gamma_rate_rng( 0.5*(M+N),(Y-residues).squaredNorm()*0.5 + 0.5*beta.cwiseProduct(beta).cwiseProduct(lambda*tau).sum());
@@ -309,19 +309,20 @@ void RHorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_
 M=200
 N=2000
 MT=2000
-B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
-#B[sample(1:M,MT-M),1]=0
-  X <- matrix(rnorm(MT*N), N, M); var(X[,1])
+B=matrix(rnorm(MT,sd=sqrt(0.5/M)),ncol=1)
+B[sample(1:MT,MT-M),1]=0
+  X <- matrix(rnorm(MT*N), N, MT); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
         Y=scale(Y)
         X=scale(X)
-      vT=30
-    vL=30
-    vC=30
-    sC=0.00000001
-    A=0.00000001
-    RHorseshoeP("./test2.csv",1, 1000,900 ,0.01,X, Y,A,0.01,1-var(G),vL,vT,1,vC,sC)
+      vT=3
+    vL=1
+
+    vC=3
+    sC=0.2
+    A=0.001
+    RHorseshoeP("./test2.csv",1, 10000,9000 ,0.01,X, Y,A,N,0.5,vL,vT,10,vC,sC)
       library(readr)
       tmp <- read_csv("./test2.csv")
       plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
@@ -338,10 +339,10 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
       hist(as.matrix(tmp[,grep("beta",names(tmp))]))
       colMeans(tmp[,grep("lambda",names(tmp))])
 
-      plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
+      plot(B,colMeans(tmp[,grep("beta",names(tmp))]),ylab="sample means B")
       lines(B,B)
-      plot(tmp$sigmaE)
-      plot(tmp$`beta[1]`)
+     # plot(tmp$sigmaE)
+     plot(tmp$`beta[1]`)
 
 
 

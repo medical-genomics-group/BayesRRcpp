@@ -62,7 +62,7 @@ struct inv_gamma_functor
 {
   inv_gamma_functor(const Scalar& vd):m_a(vd){}
 
-  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rate_rng(0.5 + 0.5*m_a,x); }
+  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rng(0.5 + 0.5*m_a,x); }
   Scalar  m_a;
 };
 
@@ -71,7 +71,7 @@ struct gamma_functor
 {
   gamma_functor(const Scalar& vd):m_a(vd){}
 
-  const Scalar operator()(const Scalar& x) const{ return gamma_rate_rng(0.5 + 0.5*m_a,x); }
+  const Scalar operator()(const Scalar& x) const{ return gamma_rng(0.5 + 0.5*m_a,x); }
   Scalar  m_a;
 };
 
@@ -80,7 +80,7 @@ struct inv_gamma_functor_init
 {
   inv_gamma_functor_init(){}
 
-  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rate_rng(0.5,x); }
+  const Scalar operator()(const Scalar& x) const{ return inv_gamma_rng(0.5,x); }
 
 };
 
@@ -93,29 +93,8 @@ struct inv_gamma_functor_init_v
   Scalar  m_a;
 };
 
-
-//Functor to perform a elementwise draw from a conditional categorical distribution with vector of probabilities pi, coefficient beta and variance sigma
-template<typename Scalar>
-struct categorical_functor
-{
-  categorical_functor(const Eigen::VectorXd& pi,const Scalar& sigmaG) : m_b(sigmaG),m_c(pi){}
-
-  const Scalar operator()(const Scalar& x) const{ return component_probs(x,m_c,m_b); }
-  Scalar  m_b;
-  Eigen::VectorXd m_c;
-};
-//Functor perform a componentwise draw from a categorical distribution with parameters pi
-template<typename Scalar>
-struct categorical_init
-{
-  categorical_init(const Eigen::VectorXd& pi) : m_c(pi){}
-
-  const Scalar operator()(const Scalar& x) const{ return categorical(m_c); }
-  Eigen::VectorXd m_c;
-};
-
 /*
-* Bayes R sampler Cholesky rank update
+* Horseshoe sampler
 * outputFile- The file in which the samples aftare burnin will be stored
 * seed- random seed
 * max_iterations- total of number of samples taken.
@@ -123,11 +102,11 @@ struct categorical_init
 * thinning- thinning regime, not implemented
 * X- matrix of snp markers, or covariates of interest
 * Y- vector of response variates, must have the same number of rows as X
-* sigma0- variance of the zero-centered normal prior over the intercept
+* A- variance of the student-t prior over tau
 * v0E- degrees of  freedom of the prior inverse scaled chi-squared distribution over residues variance
 * s02E - scale parameter of the prior inverse scaled chi-squared distribution over residues variance
-* v0G- degrees of freedom of the prior inverse scaled chi-squared distribution over genetic effects variance
-* s02G- scale parameter of the prior inverse scaled chi-squared distribution over genetic effects variance
+* vL- degrees of freedom of the student t prior over local parameters lambda, vL=1 gives a cauchy prior
+* vT- degrees of freedom of the student t prior over global parameter tau, vG=1 gives a cauchy prior
 * B- integer lower than number of columns of X, number of blocks in which the effects beta will be conditiionally divided as p(beta_B|beta_\B,.)
 */
 // [[Rcpp::export]]
@@ -203,19 +182,20 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
 
 
-    beta=(xtX).colPivHouseholderQr().solve(X.transpose()*Y);
+    //beta=(xtX).colPivHouseholderQr().solve(X.transpose()*Y);
+    beta.setRandom();
     mu=norm_rng(0,1);
-    sigmaE=inv_scaled_chisq_rng(v0E,s02E);
+    sigmaE=0.5;
     std::cout<< "initial SigmaE " << sigmaE<<"\n";
-    eta=1/inv_gamma_rate_rng(0.5,1/pow(A,2));
+    eta=inv_gamma_rate_rng(0.5,1/pow(A,2));
     std::cout<< "initial eta " << eta<<"\n";
-    tau=1/inv_gamma_rate_rng(0.5*vT,vT*eta);
+    tau=inv_gamma_rate_rng(0.5*vT,vT/eta);
 
-    tau=1/A;
+   // tau=1/A;
     std::cout<< "initial tau " << tau<<"\n";
-    v=v.setOnes().unaryExpr(inv_gamma_functor_init<double>()).cwiseInverse();
+    v=v.setOnes().unaryExpr(inv_gamma_functor_init<double>());
     //std::cout<< "initial v" << eta;
-    lambda=v.unaryExpr(inv_gamma_functor_init_v<double>(vL)).cwiseInverse();
+    lambda=v.unaryExpr(inv_gamma_functor_init_v<double>(vL));
     //std::cout<< "initial lambda" << lambda;
 
 
@@ -226,17 +206,19 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
     for(int iteration=0; iteration < max_iterations; iteration++){
    //   std::cout <<beta.col(0) <<"\n";
       std::cout << "iteration: "<<iteration <<"\n";
-      lambda=(vL*v+(0.5*beta.cwiseProduct(beta)*(tau))).unaryExpr(gamma_functor<double>(vL));
+      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/tau))).unaryExpr(inv_gamma_functor<double>(vL));
 
-      tau= gamma_rate_rng(0.5*(M+vT),vT*eta+((0.5)*((beta.array().pow(2))*lambda.array()).sum()));
-      tau=1/A;
+      tau= inv_gamma_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum()));
+     // tau=A;
+
       std::cout <<"tau" << tau<<"\n";
 
       blockNo=1;
       b=M/B;
+      mu_f.setZero();
 
       VectorXd temp(M);
-      temp=(lambda*tau);
+      temp=(lambda*tau).cwiseInverse();
 
       for(int block=0; block < M;block+=b){
 
@@ -261,16 +243,17 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
         beta.block(beginSegment,0,b,1)= mvnCoef_rng(1,
                    X.block(0,beginSegment,N,b).transpose()*(Y-mu_b-mu_f),
                    xtX.block(beginSegment,beginSegment,b,b),
-                   temp.segment(beginSegment,b)*sigmaE,sigmaE); //check which one is the correct expression (substitute 1.0 with sigmaE)
+                   sigmaE*temp.segment(beginSegment,b),sigmaE); //check which one is the correct expression (substitute 1.0 with sigmaE)
 
         mu_f+=X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1);
       }
 
 
       residues=mu_f;
-      eta = gamma_rate_rng(0.5+0.5*vT,(1.0/(pow(A,2))+vT*tau));
-      v=(vL*(lambda).array()+1.0).unaryExpr(gamma_functor<double>(vL));
-      sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
+      eta = inv_gamma_rng(0.5+0.5*vT,(1.0/(pow(A,2)*sigmaE)+vT/tau));
+      v=(vL/(lambda).array()+1.0).unaryExpr(inv_gamma_functor<double>(vL));
+     // sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
+      sigmaE=inv_gamma_rng(0.5*v0E+ 0.5*(N+1),(Y-residues).squaredNorm()*0.5 +1.0/(A*A*eta) +0.5*v0E*s02E);
       std::cout << sigmaE<<"\n";
       sum_beta_sqr= (1.0/N)*residues.squaredNorm() - pow(residues.mean(),2);
       if(iteration >= burn_in)
@@ -320,13 +303,18 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 /*** R
 M=2000
 N=2000
-B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
+MT=200
+B=matrix(rnorm(M,sd=sqrt(0.5/MT)),ncol=1)
+B[sample(1:M,M-MT),1]=0
   X <- matrix(rnorm(M*N), N, M); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
         Y=scale(Y)
         X=scale(X)
-       HorseshoeP("./test2.csv",1, 400,300 ,1000,X, Y,1000,N,0.48,30,30,2)
+        vT=1
+        vL=300000
+        A=0.002
+       HorseshoeP("./test2.csv",1, 10000,9000 ,0.01,X, Y,A,N,1-var(G),vL,vT,2)
         library(readr)
         tmp <- read_csv("./test2.csv")
         plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
