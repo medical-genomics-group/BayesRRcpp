@@ -253,7 +253,7 @@ void RHorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_
       tau=A;
       c2=inv_gamma_rate_rng(0.5*vC+0.5*M,vC*sC*0.5+0.5*beta.squaredNorm());
       c2=sC;
-      eta = inv_gamma_rate_rng(0.5+0.5*vT,(sigmaE/(A*A))+vT/tau);
+      eta = inv_gamma_rate_rng(0.5+0.5*vT,(1.0/(A*A))+vT/tau);
       v=(vL/(lambda).array()+1.0).unaryExpr(inv_gamma_functor<double>(vL));
       sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
       // sigmaE=gamma_rate_rng( 0.5*(M+N),(Y-residues).squaredNorm()*0.5 + 0.5*beta.cwiseProduct(beta).cwiseProduct(lambda*tau).sum());
