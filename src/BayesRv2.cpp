@@ -138,21 +138,25 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     Vector4d muk;
     Vector3d denom;
     int marker;
-    double num;
     double acum;
 
+    priorPi[0]=0.5;
+    priorPi[1]=0.5/3;
+    priorPi[2]=0.5/3;
+    priorPi[3]=0.5/3;
     y_tilde.setZero();
-    priorPi.setOnes();
-    priorPi*=0.25;
     cVa[0] = 0;
     cVa[1] = 0.0001;
     cVa[2] = 0.001;
     cVa[3] = 0.01;
 
-    cVaI.setZero();
-    cVaI.segment(1,3)=cVa.segment(1,3).cwiseInverse();
+    cVaI[0] = 0;
+    cVaI[1] = 1000;
+    cVaI[2] = 100;
+    cVaI[3] = 10;
+
     beta=beta.setRandom();
-    beta=(beta.array() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
+    //beta=(beta.array().abs() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
     mu=norm_rng(0,1);
     sigmaE=0.05*beta_rng(1,1);
     sigmaG=0.05*beta_rng(1,1);
@@ -164,11 +168,9 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     for(int iteration=0; iteration < max_iterations; iteration++){
 
       std::cout << "iteration: "<<iteration <<"\n";
-      epsilon= epsilon.array()+mu;
-      mu = norm_rng(epsilon.sum()/(double)N, sigmaE/(double)N);
-
-
-      epsilon= epsilon.array()-mu;
+      epsilon= epsilon.array()+mu;//  we substract previous value
+      mu = norm_rng(epsilon.sum()/(double)N, sigmaE/(double)N); //update mu
+      epsilon= epsilon.array()-mu;// we substract again now epsilon =Y-mu-X*beta
 
 
       std::random_shuffle(markerI.begin(), markerI.end());
@@ -180,39 +182,47 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
         marker= markerI[j];
 
 
-        y_tilde= epsilon.array()+(X.col(marker)*beta(marker,0)).array();
+        y_tilde= epsilon.array()+(X.col(marker)*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)
 
 
 
-        muk[0]=0.0;
-        num=X.col(marker).cwiseProduct(y_tilde).array().sum();
+        muk[0]=0.0;//muk for the zeroth component=0
 
+       // std::cout<< muk;
+        //we compute the denominator in the variance expression to save computations
         denom=X.col(marker).squaredNorm()+(sigmaE/sigmaG)*cVaI.segment(1,3).array();
+        //muk for the other components is computed according to equaitons
+        muk.segment(1,3)= (X.col(marker).cwiseProduct(y_tilde)).sum()/denom.array();
 
-        muk.segment(1,3)= num/denom.array();
 
-        logL= pi.array().log() -
-          0.5*((double)N*log(sigmaE)+(((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.array() + 1).array().log()).abs())-
-                  0.5*(y_tilde.squaredNorm()-muk.array()*X.col(marker).cwiseProduct(y_tilde).squaredNorm()).array()/sigmaE;
 
+        logL= pi.array().log();
+
+        logL.segment(1,3)=logL.segment(1,3).array() - 0.5*((double)N*log(sigmaE)+(((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,3).array() + 1).array().log())).abs()-
+                  0.5*(y_tilde.squaredNorm() - muk.segment(1,3).array().abs()*((X.col(marker).cwiseProduct(y_tilde)).squaredNorm()))/sigmaE;
 
         double p(beta_rng(1,1));
-        acum=1.0/((logL.array()-logL[0]).exp().sum());
+        //acum=1.0/((logL.array()-logL[0]).exp().sum());
+        acum=pi(0);
+
+
 
         for(int k=0;k<4;k++){
           if(p<=acum){
             if(k==0){
+              //std::cout<<muk<<"\n";
               beta(marker,0)=0;
             }else{
               beta(marker,0)=norm_rng(muk[k],sigmaE/denom[k-1]);
             }
             v[k]+=1.0;
+
             break;
           }else{
-            acum+=1.0/((logL.array()-logL[k+1]).exp().sum());
+            acum+=1.0/((logL.segment(1,3).array()-logL[k+1]).exp().sum());
           }
         }
-       epsilon=y_tilde-X.col(marker)*beta(marker,0);
+       epsilon=y_tilde-X.col(marker)*beta(marker,0);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)- X.col(marker)*beta(marker)
 
       }
 
@@ -230,7 +240,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
       pi=dirichilet_rng(v);
 
       //std::cout<< "pi:"<<pi<<"\n";
-      sum_beta_sqr= (1.0/N)*epsilon.squaredNorm() - pow(epsilon.mean(),2);
+      sum_beta_sqr= (1.0/N)*(epsilon.array()-Y.array()+mu).pow(2).sum() - pow((epsilon.array()-Y.array()+mu).mean(),2);
       //buffer << iteration<<"\n";//<<"\t"<< mu <<"\t"<< beta.col(1).transpose()<<"\t"<< sigmaG <<"\t"<<sigmaE <<"\t"<< components.transpose()<< "\n";
       if(iteration >= burn_in)
       {
@@ -259,9 +269,6 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
   }
   outFile<<"sigmaE,"<<"sigmaG,";
-  for(unsigned int i = 0; i < M; ++i){
-    outFile << "comp[" << (i+1) << "],";
-  }
   outFile<<"EV\n";
   while(!flag ){
     if(q.try_dequeue(sampleq))
@@ -281,12 +288,13 @@ N=2000 #observations
 MT=2000 #number of markers
 B=matrix(rnorm(MT,sd=sqrt(0.5/M)),ncol=1) #marker effects, M marquers explain approx 50% of the variance
 B[sample(1:MT,MT-M),1]=0 #we set MT-M marker effects to zero
+#B=-abs(B)
 X <- matrix(rnorm(MT*N), N, MT); var(X[,1])
 G <- X%*%B; var(G)
 Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
 Y=scale(Y)
 X=scale(X)
-BayesRSamplerV2("./test2.csv",2, 10000, 9000,1,X, Y,0.01,0.01,0.01,0.01,0.01,100)
+BayesRSamplerV2("./test2.csv",2, 20000, 19000,1,X, Y,0.01,0.01,0.01,0.01,0.01,100)
 library(readr)
 tmp <- read_csv("./test2.csv")
 #names(tmp)
