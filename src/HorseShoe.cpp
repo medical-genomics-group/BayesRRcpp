@@ -206,9 +206,9 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
     for(int iteration=0; iteration < max_iterations; iteration++){
    //   std::cout <<beta.col(0) <<"\n";
       std::cout << "iteration: "<<iteration <<"\n";
-      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/tau))).unaryExpr(inv_gamma_functor<double>(vL));
+      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/(tau*sigmaE)))).unaryExpr(inv_gamma_functor<double>(vL));
 
-      tau= inv_gamma_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum()));
+      tau= inv_gamma_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum())/sigmaE);
      // tau=A;
 
       std::cout <<"tau" << tau<<"\n";
@@ -241,19 +241,19 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
 
         beta.block(beginSegment,0,b,1)= mvnCoef_rng(1,
-                   X.block(0,beginSegment,N,b).transpose()*(Y-mu_b-mu_f),
-                   xtX.block(beginSegment,beginSegment,b,b),
-                   sigmaE*temp.segment(beginSegment,b),sigmaE); //check which one is the correct expression (substitute 1.0 with sigmaE)
+                   X.block(0,beginSegment,N,b).transpose()*(Y-mu_b-mu_f)/sigmaE,
+                   xtX.block(beginSegment,beginSegment,b,b)/sigmaE,
+                   temp.segment(beginSegment,b),1.0); //check which one is the correct expression (substitute 1.0 with sigmaE)
 
         mu_f+=X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1);
       }
 
 
       residues=mu_f;
-      eta = inv_gamma_rng(0.5+0.5*vT,(1.0/(pow(A,2)*sigmaE)+vT/tau));
+      eta = inv_gamma_rng(0.5+0.5*vT,(1.0/(pow(A,2))+vT/tau));
       v=(vL/(lambda).array()+1.0).unaryExpr(inv_gamma_functor<double>(vL));
      // sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
-      sigmaE=inv_gamma_rng(0.5*v0E+ 0.5*(N+1),(Y-residues).squaredNorm()*0.5 +1.0/(A*A*eta) +0.5*v0E*s02E);
+      sigmaE=inv_gamma_rng( 0.5*(N+M),(Y-residues).squaredNorm()*0.5 + 0.5*(beta.array().pow(2)/(tau*lambda.array())).sum());
       std::cout << sigmaE<<"\n";
       sum_beta_sqr= (1.0/N)*residues.squaredNorm() - pow(residues.mean(),2);
       if(iteration >= burn_in)
@@ -301,18 +301,18 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 
 
 /*** R
-M=2000
+M=200
 N=2000
 MT=200
-B=matrix(rnorm(M,sd=sqrt(0.5/MT)),ncol=1)
-B[sample(1:M,M-MT),1]=0
-  X <- matrix(rnorm(M*N), N, M); var(X[,1])
+B=matrix(rnorm(MT,sd=sqrt(0.5/MT)),ncol=1)
+#B[sample(1:M,M-MT),1]=0
+  X <- matrix(rnorm(M*N), N, MT); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
         Y=scale(Y)
         X=scale(X)
-        vT=1
-        vL=300000
+        vT=100
+        vL=100
         A=0.002
        HorseshoeP("./test2.csv",1, 10000,9000 ,0.01,X, Y,A,N,1-var(G),vL,vT,2)
         library(readr)

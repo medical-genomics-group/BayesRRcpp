@@ -37,7 +37,7 @@ double gamma_rng(double shape,double scale){
 }
 // [[Rcpp::export]]
 double inv_gamma_rate_rng(double shape,double rate){
-  return 1.0 / R::rgamma(shape, rate);
+  return 1.0 / gamma_rate_rng(shape, rate);
 }
 // [[Rcpp::export]]
 double gamma_rate_rng(double shape,double rate){
