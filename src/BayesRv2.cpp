@@ -87,7 +87,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
   if(sigma0 < 0 || v0E < 0 || s02E < 0 || v0G < 0||  s02G < 0 )//validations related to hyperparameters
   {
     std::cout<<"error: hyper parameters have to be positive";
-    return;
+    //return;
   }
   /////end of declarations//////
   ones.setOnes();
@@ -141,9 +141,10 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     double acum;
 
     priorPi[0]=B;
-    priorPi[1]=(1.0-B)/3.0;
-    priorPi[2]=(1.0-B)/3.0;
-    priorPi[3]=(1.0-B)/3.0;
+
+
+
+    priorPi.segment(1,3)=B*cVa.segment(1,3).segment(1,3).array()/cVa.segment(1,3).segment(1,3).sum();
     y_tilde.setZero();
     cVa[0] = 0;
     cVa[1] = 0.0001;
@@ -158,9 +159,9 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     beta=beta.setRandom();
     //beta=(beta.array().abs() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
     mu=norm_rng(0,1);
-    sigmaE=0.05*beta_rng(1,1);
-    sigmaG=0.05*beta_rng(1,1);
-    pi=dirichilet_rng(priorPi);
+    sigmaE=beta_rng(1,1);
+    sigmaG=beta_rng(1,1);
+    pi=priorPi;
 
     components.setZero();
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
@@ -176,7 +177,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
       std::random_shuffle(markerI.begin(), markerI.end());
 
       m0=0;
-      v=priorPi;
+      v.setZero();
       for(int j=0; j < M; j++){
 
         marker= markerI[j];
@@ -244,7 +245,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
       }
 
-      m0=M-v[0]-priorPi[0];
+      m0=M-v[0];
       sigmaG=inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
 
 
@@ -255,7 +256,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
 
 
-      pi=dirichilet_rng(v);
+      pi=dirichilet_rng(v+Vector4d::Ones());
 
       //std::cout<< "pi:"<<pi<<"\n";
       sum_beta_sqr= (1.0/N)*(epsilon.array()-Y.array()+mu).pow(2).sum() - pow((epsilon.array()-Y.array()+mu).mean(),2);
@@ -323,8 +324,8 @@ P=0.5 #prior probability of a marker being excluded from the model
 sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED
 v0E=0.01 # degrees of freedom over the inv scaled chi square prior over residuals variance
 s02E=0.01 #scale of the inv scaled chi square prior over residuals variance
-v0G=1 #degrees of freedom of the inv bla bla prior over snp effects
-s02G=1 # scale for the same
+v0G=-2 #degrees of freedom of the inv bla bla prior over snp effects
+s02G=-2 # scale for the same
 BayesRSamplerV2("./test2.csv",2, 50000, 20000,10,X, Y,sigma0,v0E,s02E,v0G,s02G,P)
 library(readr)
 tmp <- read_csv("./test2.csv")
