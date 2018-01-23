@@ -146,8 +146,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // HorseshoePlus
-void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double A, double v0E, double s02E, double vL, double vT, int B);
-RcppExport SEXP _BayesRRcpp_HorseshoePlus(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP ASEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP vLSEXP, SEXP vTSEXP, SEXP BSEXP) {
+void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double A, double v0E, double s02E, double vL, double vT, int B, double c2);
+RcppExport SEXP _BayesRRcpp_HorseshoePlus(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP ASEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP vLSEXP, SEXP vTSEXP, SEXP BSEXP, SEXP c2SEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
@@ -163,7 +163,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type vL(vLSEXP);
     Rcpp::traits::input_parameter< double >::type vT(vTSEXP);
     Rcpp::traits::input_parameter< int >::type B(BSEXP);
-    HorseshoePlus(outputFile, seed, max_iterations, burn_in, thinning, X, Y, A, v0E, s02E, vL, vT, B);
+    Rcpp::traits::input_parameter< double >::type c2(c2SEXP);
+    HorseshoePlus(outputFile, seed, max_iterations, burn_in, thinning, X, Y, A, v0E, s02E, vL, vT, B, c2);
     return R_NilValue;
 END_RCPP
 }
@@ -243,7 +244,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_norm_rng", (DL_FUNC) &_BayesRRcpp_norm_rng, 2},
     {"_BayesRRcpp_component_probs", (DL_FUNC) &_BayesRRcpp_component_probs, 2},
     {"_BayesRRcpp_HorseshoeP", (DL_FUNC) &_BayesRRcpp_HorseshoeP, 13},
-    {"_BayesRRcpp_HorseshoePlus", (DL_FUNC) &_BayesRRcpp_HorseshoePlus, 13},
+    {"_BayesRRcpp_HorseshoePlus", (DL_FUNC) &_BayesRRcpp_HorseshoePlus, 14},
     {"_BayesRRcpp_sumDiagonal", (DL_FUNC) &_BayesRRcpp_sumDiagonal, 2},
     {"_BayesRRcpp_mvn_rng", (DL_FUNC) &_BayesRRcpp_mvn_rng, 3},
     {"_BayesRRcpp_mvnCoef_rng", (DL_FUNC) &_BayesRRcpp_mvnCoef_rng, 5},

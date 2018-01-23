@@ -249,8 +249,8 @@ void RHorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_
 
       residues=mu_f;
       lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/tau))).unaryExpr(inv_gamma_functor<double>(vL));
-      tau= inv_gamma_rate_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum()));
-      tau=A;
+      tau= A*inv_gamma_rate_rng(0.5*(M+vT),vT/2+((0.5)*((beta.array().pow(2))/lambda.array()).sum()));
+
       c2=inv_gamma_rate_rng(0.5*vC+0.5*M,vC*sC*0.5+0.5*beta.squaredNorm());
       c2=sC;
       eta = inv_gamma_rate_rng(0.5+0.5*vT,(1.0/(A*A))+vT/tau);
@@ -323,11 +323,11 @@ B[sample(1:MT,MT-M),1]=0 #we set MT-M marker effects to zero
     vC=3 #degrees of freedom regularising parameter, currently doesnt take effect
     sC=0.2 #prior scale of regularising parameter, currently it IS the value of the regularising parameter
     A=0.001 #prior scale over the global shrinkage parameter, currently, it IS the regularising parameter
-    B=10 # number of blocks marker effects are partitioned, more blocks means quicker inference but more autocorrelation between parameters
+    C=10 # number of blocks marker effects are partitioned, more blocks means quicker inference but more autocorrelation between parameters
     s02E=0.5 #prior scale of the residuals variance
-    v0E=N #degrees of freedom of prior over residuals variance
+    v0E=1 #degrees of freedom of prior over residuals variance
 
-    RHorseshoeP("./test2.csv",1, 10000,9000 ,0.01,X, Y,A,v0E,s02E,vL,vT,B,vC,sC)
+    RHorseshoeP("./test2.csv",1, 50000,30000 ,0.01,X, Y,A,v0E,s02E,vL,vT,C,vC,sC)
       library(readr)
       tmp <- read_csv("./test2.csv")
       plot(B,colMeans(tmp[,grep("beta",names(tmp))]))

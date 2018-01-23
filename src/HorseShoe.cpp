@@ -206,9 +206,9 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
     for(int iteration=0; iteration < max_iterations; iteration++){
    //   std::cout <<beta.col(0) <<"\n";
       std::cout << "iteration: "<<iteration <<"\n";
-      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/(tau*sigmaE)))).unaryExpr(inv_gamma_functor<double>(vL));
+      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/(pow(A,2)*tau*sigmaE)))).unaryExpr(inv_gamma_functor<double>(vL));
 
-      tau= inv_gamma_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum())/sigmaE);
+      tau= inv_gamma_rng(0.5*(M+vT),vT/2.0+((0.5)*((beta.array().pow(2))/lambda.array()).sum())/(sigmaE*pow(A,2)));
      // tau=A;
 
       std::cout <<"tau" << tau<<"\n";
@@ -218,7 +218,7 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
       mu_f.setZero();
 
       VectorXd temp(M);
-      temp=(lambda*tau).cwiseInverse();
+      temp=(pow(A,2)*lambda*tau).cwiseInverse();
 
       for(int block=0; block < M;block+=b){
 
@@ -253,13 +253,16 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
       eta = inv_gamma_rng(0.5+0.5*vT,(1.0/(pow(A,2))+vT/tau));
       v=(vL/(lambda).array()+1.0).unaryExpr(inv_gamma_functor<double>(vL));
      // sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
-      sigmaE=inv_gamma_rng( 0.5*(N+M),(Y-residues).squaredNorm()*0.5 + 0.5*(beta.array().pow(2)/(tau*lambda.array())).sum());
+      sigmaE=inv_gamma_rng( 0.5*(N+M),(Y-residues).squaredNorm()*0.5 + 0.5*(beta.array().pow(2)/(pow(A,2)*tau*lambda.array())).sum());
       std::cout << sigmaE<<"\n";
       sum_beta_sqr= (1.0/N)*residues.squaredNorm() - pow(residues.mean(),2);
       if(iteration >= burn_in)
       {
-        sample<< iteration,mu,beta,sigmaE,tau,lambda, sum_beta_sqr;
-        q.enqueue(sample);
+        if(thinning % iteration ==0){
+          sample<< iteration,mu,beta,sigmaE,tau,lambda, sum_beta_sqr;
+          q.enqueue(sample);
+        }
+
       }
 
     }
@@ -303,18 +306,18 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
 /*** R
 M=200
 N=2000
-MT=200
-B=matrix(rnorm(MT,sd=sqrt(0.5/MT)),ncol=1)
-#B[sample(1:M,M-MT),1]=0
+MT=2000
+B=matrix(rnorm(MT,sd=sqrt(0.5/M)),ncol=1)
+B[sample(1:MT,MT-M),1]=0
   X <- matrix(rnorm(M*N), N, MT); var(X[,1])
     G <- X%*%B; var(G)
       Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
         Y=scale(Y)
         X=scale(X)
         vT=100
-        vL=100
-        A=0.002
-       HorseshoeP("./test2.csv",1, 10000,9000 ,0.01,X, Y,A,N,1-var(G),vL,vT,2)
+        vL=10
+        A=0.01
+       HorseshoeP("./test2.csv",1, 50000,30000 ,10,X, Y,A,1,1-var(G),vL,vT,1000)
         library(readr)
         tmp <- read_csv("./test2.csv")
         plot(B,colMeans(tmp[,grep("beta",names(tmp))]))

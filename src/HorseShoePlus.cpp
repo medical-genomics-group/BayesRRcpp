@@ -110,7 +110,7 @@ struct inv_gamma_functor_init_v
 * B- integer lower than number of columns of X, number of blocks in which the effects beta will be conditiionally divided as p(beta_B|beta_\B,.)
 */
 // [[Rcpp::export]]
-void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double A, double v0E, double s02E, double vL, double vT, int B) {
+void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double A, double v0E, double s02E, double vL, double vT, int B,double c2) {
   int flag;
   moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
   flag=0;
@@ -177,11 +177,10 @@ void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int bur
     double sum_beta_sqr;
 
     VectorXd sample(2*M+5);
-
     int beginSegment;
     int endSegment;
     int blockNo;
-    double c2=0.1;
+
 
 
     //beta=(xtX).colPivHouseholderQr().solve(X.transpose()*Y);
@@ -191,7 +190,7 @@ void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int bur
     std::cout<< "initial SigmaE " << sigmaE<<"\n";
     eta=inv_gamma_rate_rng(0.5,1/pow(A,2));
     std::cout<< "initial eta " << eta<<"\n";
-    tau=inv_gamma_rate_rng(0.5*vT,vT/eta);
+    tau=(1.0/eta)*inv_gamma_rate_rng(0.5*vT,vT);
 
    // tau=1/A;
     std::cout<< "initial tau " << tau<<"\n";
@@ -210,10 +209,7 @@ void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int bur
     for(int iteration=0; iteration < max_iterations; iteration++){
    //   std::cout <<beta.col(0) <<"\n";
       std::cout << "iteration: "<<iteration <<"\n";
-      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/(tau*sigmaE)))).unaryExpr(inv_gamma_functor<double>(vL));
-
-      tau= inv_gamma_rate_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum())/sigmaE);
-      tau=A;
+      sigmaE=inv_gamma_rate_rng( 0.5*(N+M+v0E+1),(Y-residues).squaredNorm()*0.5 + 0.5*(beta.array().pow(2)/(((tau*c2*lambda.array()).cwiseQuotient(tau*lambda.array()+c2)).cwiseInverse())).sum()+0.5*v0E*s02E);
 
       std::cout <<"tau" << tau<<"\n";
 
@@ -253,13 +249,18 @@ void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int bur
       }
 
 
+      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/(tau*sigmaE)))).unaryExpr(inv_gamma_functor<double>(vL));
+
+      tau= sqrt(A)*sqrt(sigmaE)*inv_gamma_rng(0.5*(M+vT),vT/2+((0.5/sigmaE)*((beta.array().pow(2))/lambda.array()).sum()));
+      //tau=A;
+
+
       residues=mu_f;
-      eta = inv_gamma_rate_rng(0.5+0.5*vT,(1.0/(pow(A,2))+vT/tau));
-      v=(vL/(lambda).array()+1.0/phi.array()).unaryExpr(inv_gamma_functor<double>(vL));
-      phi=(1.0/v.array()+1.0/chi.array()).unaryExpr(inv_gamma_functor<double>(1.0));
-      chi=(1.0+1.0/phi.array()).unaryExpr(inv_gamma_functor<double>(1.0));
+      eta = inv_gamma_rate_rng(0.5+0.5*vT,1.0/(pow(A,2))+vT/tau);
+      v=(vL/(lambda).array()+phi.array()).unaryExpr(inv_gamma_functor<double>(vL));
+      phi=(1.0/v.array()+chi.array()).unaryExpr(exponential_functor<double>());
+      chi=(1.0+phi.array()).unaryExpr(exponential_functor<double>());
      // sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
-      sigmaE=inv_gamma_rate_rng( 0.5*(N+M),(Y-residues).squaredNorm()*0.5 + 0.5*(beta.array().pow(2)/(((tau*c2*lambda.array()).cwiseQuotient(tau*lambda.array()+c2)).cwiseInverse())).sum());
       //sigmaE=0.5;
       std::cout << sigmaE<<"\n";
       sum_beta_sqr= (1.0/N)*residues.squaredNorm() - pow(residues.mean(),2);
@@ -311,7 +312,7 @@ void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int bur
 
 
 /*** R
-M=2000
+M=3000
 N=2000
 MT=200
 B=matrix(rnorm(M,sd=sqrt(0.5/MT)),ncol=1)
@@ -321,10 +322,11 @@ B[sample(1:M,M-MT),1]=0
       Y=X%*%B+rnorm(N,sd=sqrt((1-var(G)))); var(Y)
         Y=scale(Y)
         X=scale(X)
-        vT=1
+        vT=30
         vL=1
         A=0.001
-       HorseshoePlus("./test2.csv",1, 2000,1000 ,1,X, Y,A,N,1-var(G),vL,vT,2)
+        c2=0.2
+       HorseshoePlus("./test2.csv",1, 50000,20000 ,10,X, Y,A,N,1-var(G),vL,vT,100,c2)
         library(readr)
         tmp <- read_csv("./test2.csv")
         plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
