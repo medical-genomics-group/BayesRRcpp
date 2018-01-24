@@ -156,16 +156,23 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     cVaI[2] = 100;
     cVaI[3] = 10;
 
-    beta=beta.setRandom();
+    //beta=beta.setRandom();
+
     //beta=(beta.array().abs() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
-    mu=norm_rng(0,1);
-    sigmaE=beta_rng(1,1);
-    sigmaG=beta_rng(1,1);
+    beta.setZero();
+
+    //mu=norm_rng(0,1);
+    mu=0;
+
+
+    sigmaG=(0.01*cVa).sum()/M;
+
     pi=priorPi;
 
     components.setZero();
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     epsilon= Y.array() - mu - (X*beta).array();
+    sigmaE=epsilon.squaredNorm()/N*0.5;
     for(int iteration=0; iteration < max_iterations; iteration++){
 
       std::cout << "iteration: "<<iteration <<"\n";
@@ -221,11 +228,15 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
         double p(beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
-        acum=pi(0);
+        //acum=pi(0);
 
 
         //uncomment this next bit if you want also to estimate the probability of the zeroth component
-        //acum=1.0/((logL.array()-logL[0]).exp().sum());
+        if(((logL.segment(1,3).array()-logL[0]).abs().array() >700 ).any() ){
+         acum=0;
+        }else{
+          acum=1.0/((logL.array()-logL[0]).exp().sum());
+        }
 
         for(int k=0;k<4;k++){
           if(p<=acum){
@@ -238,7 +249,12 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
             components[marker]=k;
             break;
           }else{
-            acum+=1.0/((logL.segment(1,3).array()-logL[k+1]).exp().sum());
+            if(((logL.segment(1,3).array()-logL[k+1]).abs().array() >700 ).any() ){
+              acum+=0;
+            }
+            else{
+              acum+=1.0/((logL.segment(1,3).array()-logL[k+1]).exp().sum());
+            }
           }
         }
        epsilon=y_tilde-X.col(marker)*beta(marker,0);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
@@ -312,21 +328,21 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 M=200 #non zero marker effects
 N=2000 #observations
 MT=2000 #number of markers
-B=matrix(rnorm(MT,sd=sqrt(0.5/M)),ncol=1) #marker effects, M marquers explain approx 50% of the variance
+B=matrix(rnorm(MT,sd=sqrt(0.5)),ncol=1) #marker effects, M marquers explain approx 50% of the variance
 B[sample(1:MT,MT-M),1]=0 #we set MT-M marker effects to zero
 #B=-abs(B)
 X <- matrix(rnorm(MT*N), N, MT); var(X[,1])
 G <- X%*%B; var(G)
-Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-Y=scale(Y)
+Y=X%*%B+rnorm(N,sd=sqrt(0.4)); var(Y)
+Y=Y
 X=scale(X)
 P=0.5 #prior probability of a marker being excluded from the model
 sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED
 v0E=0.01 # degrees of freedom over the inv scaled chi square prior over residuals variance
 s02E=0.01 #scale of the inv scaled chi square prior over residuals variance
-v0G=-2 #degrees of freedom of the inv bla bla prior over snp effects
-s02G=-2 # scale for the same
-BayesRSamplerV2("./test2.csv",2, 50000, 20000,10,X, Y,sigma0,v0E,s02E,v0G,s02G,P)
+v0G=0.01 #degrees of freedom of the inv bla bla prior over snp effects
+s02G=0.01 # scale for the same
+BayesRSamplerV2("./test2.csv",2, 5000, 2000,10,X, Y,sigma0,v0E,s02E,v0G,s02G,P)
 library(readr)
 tmp <- read_csv("./test2.csv")
 #names(tmp)
