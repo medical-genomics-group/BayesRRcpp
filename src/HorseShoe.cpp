@@ -207,9 +207,17 @@ void HorseshoeP(std::string outputFile, int seed, int max_iterations, int burn_i
    //   std::cout <<beta.col(0) <<"\n";
       std::cout << "iteration: "<<iteration <<"\n";
       lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/(pow(A,2)*tau*sigmaE)))).unaryExpr(inv_gamma_functor<double>(vL));
-
-      tau= inv_gamma_rng(0.5*(M+vT),vT/2.0+((0.5)*((beta.array().pow(2))/lambda.array()).sum())/(sigmaE*pow(A,2)));
-     // tau=A;
+      bool flag(0);
+      int counter(0);
+      while(!flag){
+       tau= inv_gamma_rng(0.5*(M+vT),vT/2.0+((0.5)*((beta.array().pow(2))/lambda.array()).sum())/(sigmaE*pow(A,2)));
+        if(tau>1e-10 || counter>5){
+          flag=1;
+        }
+        else{
+          counter++;
+        }
+      }
 
       std::cout <<"tau" << tau<<"\n";
 
@@ -315,11 +323,13 @@ B[sample(1:MT,MT-M),1]=0
         Y=scale(Y)
         X=scale(X)
         vT=100
-        vL=10
-        A=0.01
-       HorseshoeP("./test2.csv",1, 50000,30000 ,10,X, Y,A,1,1-var(G),vL,vT,1000)
+        vL=30
+        A=0.001
+       HorseshoeP("./test3.csv",1, 5000,3000 ,1,X, Y,A,1,1-var(G),vL,vT,1000)
         library(readr)
-        tmp <- read_csv("./test2.csv")
+
+        tmp <- read_csv("./test3.csv")
+
         plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
         lines(B,B)
         abline(h=0)

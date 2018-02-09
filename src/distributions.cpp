@@ -64,17 +64,13 @@ double component_probs(double b2,Eigen::VectorXd pi){
     return 1;
 }
 
-double categorical(Eigen::VectorXd probs){
+inline double bernoulli_rng(double probs0,double probs1,double cats0,double cats1){
   double p;
-
   p=R::runif(0,1);
-  if(p<= probs[0]/(probs[0]+probs[1]))
-    return 5e-2;
+  if(p<= probs0/(probs0+probs1))
+    return cats0;
   else
-    return 1;
-
-
-
+    return cats1;
 }
 
 double beta_rng(double a,double b){

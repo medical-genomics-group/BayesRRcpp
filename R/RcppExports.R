@@ -61,3 +61,7 @@ RHorseshoeP <- function(outputFile, seed, max_iterations, burn_in, thinning, X, 
     invisible(.Call(`_BayesRRcpp_RHorseshoeP`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, A, v0E, s02E, vL, vT, B, vC, sC))
 }
 
+spikeSlab <- function(outputFile, seed, max_iterations, burn_in, thinning, X, Y, cats, v0E, s02E, v0L, s02L, B) {
+    invisible(.Call(`_BayesRRcpp_spikeSlab`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, cats, v0E, s02E, v0L, s02L, B))
+}
+

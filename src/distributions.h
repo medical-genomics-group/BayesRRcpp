@@ -17,5 +17,6 @@ double component_probs(double b,Eigen::VectorXd pi);
 double categorical(Eigen::VectorXd probs);
 double beta_rng(double a, double b);
 double exp_rng(double a);
+//inline double bernoulli_rng(double probs0,double probs1,double cats0,double cats1);
 //double spike_slab_rng(double w,double lambda, double sigmaS);
 #endif

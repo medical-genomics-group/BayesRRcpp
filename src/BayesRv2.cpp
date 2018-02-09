@@ -22,6 +22,24 @@ using Eigen::Map;
 using Eigen::Upper;
 typedef Map<MatrixXd> MapMatd;
 
+
+template<typename Scalar>
+struct scalar_normal_dist_op
+{
+  static std::mt19937 rng;                        // The uniform pseudo-random algorithm
+  mutable std::normal_distribution<Scalar> norm; // gaussian combinator
+
+  EIGEN_EMPTY_STRUCT_CTOR(scalar_normal_dist_op)
+
+    template<typename Index>
+    inline const Scalar operator() (Index, Index = 0) const { return norm(rng); }
+    inline void seed(const uint64_t &s) { rng.seed(s); }
+};
+
+template<typename Scalar>
+std::mt19937 scalar_normal_dist_op<Scalar>::rng;
+
+
 inline MatrixXd AtA(const MapMatd& A) {
   int n(A.cols());
   return MatrixXd(n,n).setZero().selfadjointView<Lower>()
@@ -147,15 +165,15 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     priorPi.segment(1,3)=B*cVa.segment(1,3).segment(1,3).array()/cVa.segment(1,3).segment(1,3).sum();
     y_tilde.setZero();
     cVa[0] = 0;
-    cVa[1] = 0.0001;
-    cVa[2] = 0.001;
-    cVa[3] = 0.01;
+    cVa[1] = 0.001;
+    cVa[2] = 0.01;
+    cVa[3] = 0.1;
+
 
     cVaI[0] = 0;
-    cVaI[1] = 1000;
-    cVaI[2] = 100;
-    cVaI[3] = 10;
-
+    cVaI[1]=1000;
+    cVaI[2]=100;
+    cVaI[3]=10;
     //beta=beta.setRandom();
 
     //beta=(beta.array().abs() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
@@ -165,7 +183,8 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     mu=0;
 
 
-    sigmaG=(0.01*cVa).sum()/M;
+   // sigmaG=(1*cVa).sum()/M;
+   sigmaG=beta_rng(1,1);
 
     pi=priorPi;
 
@@ -225,6 +244,9 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
         // Here we reproduce the fortran code
         logL.segment(1,3)=logL.segment(1,3).array() - 0.5*((((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,3).array() + 1).array().log()))+
           0.5*( muk.segment(1,3).array()*((X.col(marker).cwiseProduct(y_tilde)).sum()))/sigmaE;
+        //double rhs((X.col(marker).cwiseProduct(y_tilde)).sum());
+         //logL.segment(1,3)=logL.segment(1,3).array() - 0.5*((((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,3).array() + 1).array().log()))+
+         //0.5*( rhs*rhs/denom.array())/sigmaE;
 
         double p(beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
@@ -244,6 +266,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
               beta(marker,0)=0;
             }else{
               beta(marker,0)=norm_rng(muk[k],sigmaE/denom[k-1]);
+              // beta(marker,0)=norm_rng(rhs/denom[k-1],sigmaE/denom[k-1]);
             }
             v[k]+=1.0;
             components[marker]=k;
@@ -275,7 +298,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
       pi=dirichilet_rng(v+Vector4d::Ones());
 
       //std::cout<< "pi:"<<pi<<"\n";
-      sum_beta_sqr= (1.0/N)*(epsilon.array()-Y.array()+mu).pow(2).sum() - pow((epsilon.array()-Y.array()+mu).mean(),2);
+      sum_beta_sqr= (1.0/N)*(epsilon.array()-Y.array()).pow(2).sum() - pow((epsilon.array()-Y.array()).mean(),2);
       //buffer << iteration<<"\n";//<<"\t"<< mu <<"\t"<< beta.col(1).transpose()<<"\t"<< sigmaG <<"\t"<<sigmaE <<"\t"<< components.transpose()<< "\n";
       if(iteration >= burn_in)
       {
@@ -308,7 +331,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
   }
   outFile<<"sigmaE,"<<"sigmaG,";
   for(unsigned int i = 0; i < M; ++i){
-    outFile << "comp[" << (i+1) << "],";
+    outFile << "pred[" << (i+1) << "],";
   }
   outFile<<"EV\n";
 

@@ -209,7 +209,7 @@ void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int bur
     for(int iteration=0; iteration < max_iterations; iteration++){
    //   std::cout <<beta.col(0) <<"\n";
       std::cout << "iteration: "<<iteration <<"\n";
-      sigmaE=inv_gamma_rate_rng( 0.5*(N+M+v0E+1),(Y-residues).squaredNorm()*0.5 + 0.5*(beta.array().pow(2)/(((tau*c2*lambda.array()).cwiseQuotient(tau*lambda.array()+c2)).cwiseInverse())).sum()+0.5*v0E*s02E);
+      sigmaE=inv_gamma_rate_rng( 0.5*(N+M+v0E),(Y-residues).squaredNorm()*0.5 + 0.5*(beta.array().pow(2)/(((tau*c2*lambda.array()).cwiseQuotient(tau*lambda.array()+c2)).cwiseInverse())).sum()+0.5*v0E*s02E);
 
       std::cout <<"tau" << tau<<"\n";
 
@@ -244,22 +244,33 @@ void HorseshoePlus(std::string outputFile, int seed, int max_iterations, int bur
                    X.block(0,beginSegment,N,b).transpose()*(Y-mu_b-mu_f)/sigmaE,
                    xtX.block(beginSegment,beginSegment,b,b)/sigmaE,
                    temp.segment(beginSegment,b),1.0); //check which one is the correct expression (substitute 1.0 with sigmaE)
-
+        (beta.block(beginSegment,0,b,1).array()<1e-8).select(beta.block(beginSegment,0,b,1),MatrixXd::Zero(b,1));
         mu_f+=X.block(0,beginSegment,N,b)*beta.block(beginSegment,0,b,1);
       }
 
 
-      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/(tau*sigmaE)))).unaryExpr(inv_gamma_functor<double>(vL));
+      lambda=(vL*v.cwiseInverse()+(0.5*beta.cwiseProduct(beta)*(1.0/(sigmaE*tau)))).unaryExpr(inv_gamma_functor<double>(vL));
 
-      tau= sqrt(A)*sqrt(sigmaE)*inv_gamma_rng(0.5*(M+vT),vT/2+((0.5/sigmaE)*((beta.array().pow(2))/lambda.array()).sum()));
+      bool flag(0);
+      int counter(0);
+      while(!flag){
+        tau=  A*inv_gamma_rng(0.5*(M+vT),vT/2+((0.5)*((beta.array().pow(2))/(A*sigmaE*lambda.array())).sum()));
+        if(tau>1e-10 || counter>5){
+          flag=1;
+        }
+        else{
+          counter++;
+        }
+      }
+
       //tau=A;
 
 
       residues=mu_f;
-      eta = inv_gamma_rate_rng(0.5+0.5*vT,1.0/(pow(A,2))+vT/tau);
-      v=(vL/(lambda).array()+phi.array()).unaryExpr(inv_gamma_functor<double>(vL));
-      phi=(1.0/v.array()+chi.array()).unaryExpr(exponential_functor<double>());
-      chi=(1.0+phi.array()).unaryExpr(exponential_functor<double>());
+      eta = inv_gamma_rate_rng(0.5+0.5*vT,1.0/(pow(A,2))+vT/(tau));
+      v=(vL/(lambda).array()+1).unaryExpr(inv_gamma_functor<double>(vL));
+     // phi=(1.0/v.array()+chi.array()).unaryExpr(exponential_functor<double>());
+      //chi=(1.0+phi.array()).unaryExpr(exponential_functor<double>());
      // sigmaE=inv_scaled_chisq_rng(v0E+N,((Y-residues).squaredNorm()+v0E*s02E)/(v0E+N));
       //sigmaE=0.5;
       std::cout << sigmaE<<"\n";
@@ -322,11 +333,11 @@ B[sample(1:M,M-MT),1]=0
       Y=X%*%B+rnorm(N,sd=sqrt((1-var(G)))); var(Y)
         Y=scale(Y)
         X=scale(X)
-        vT=30
+        vT=1
         vL=1
         A=0.001
         c2=0.2
-       HorseshoePlus("./test2.csv",1, 50000,20000 ,10,X, Y,A,N,1-var(G),vL,vT,100,c2)
+       HorseshoePlus("./test2.csv",1, 50000,30000 ,10,X, Y,A,1,1-var(G),vL,vT,100,c2)
         library(readr)
         tmp <- read_csv("./test2.csv")
         plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
