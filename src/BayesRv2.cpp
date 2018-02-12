@@ -171,9 +171,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
 
     cVaI[0] = 0;
-    cVaI[1]=1000;
-    cVaI[2]=100;
-    cVaI[3]=10;
+    cVaI.segment(1,cVaI.size()-1)=cVa.segment(1,cVaI.size()-1).cwiseInverse();
     //beta=beta.setRandom();
 
     //beta=(beta.array().abs() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
@@ -194,7 +192,10 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     sigmaE=epsilon.squaredNorm()/N*0.5;
     for(int iteration=0; iteration < max_iterations; iteration++){
 
-      std::cout << "iteration: "<<iteration <<"\n";
+      if(iteration>0)
+        if( iteration % (int)std::ceil(max_iterations/10) ==0)
+       std::cout << "iteration: "<<iteration <<"\n";
+
       epsilon= epsilon.array()+mu;//  we substract previous value
       mu = norm_rng(epsilon.sum()/(double)N, sigmaE/(double)N); //update mu
       epsilon= epsilon.array()-mu;// we substract again now epsilon =Y-mu-X*beta
