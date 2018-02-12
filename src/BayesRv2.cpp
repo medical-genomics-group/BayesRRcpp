@@ -269,7 +269,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
               acum+=0;
             }
             else{
-              acum+=1.0/((logL.segment(1,(K-1)).array()-logL[k+1]).exp().sum());//???
+              acum+=1.0/((logL.array()-logL[k+1]).exp().sum());//???
             }
           }
         }
