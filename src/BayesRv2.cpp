@@ -40,12 +40,6 @@ template<typename Scalar>
 std::mt19937 scalar_normal_dist_op<Scalar>::rng;
 
 
-inline MatrixXd AtA(const MapMatd& A) {
-  int n(A.cols());
-  return MatrixXd(n,n).setZero().selfadjointView<Lower>()
-                      .rankUpdate(A.adjoint());
-}
-//Functor to perform a elementwise draw from a conditional categorical distribution with vector of probabilities pi, coefficient beta and variance sigma
 template<typename Scalar>
 struct categorical_functor
 {
@@ -79,24 +73,19 @@ struct categorical_init
 * s02E - scale parameter of the prior inverse scaled chi-squared distribution over residues variance
 * v0G- degrees of freedom of the prior inverse scaled chi-squared distribution over genetic effects variance
 * s02G- scale parameter of the prior inverse scaled chi-squared distribution over genetic effects variance
-* B- integer lower than number of columns of X, number of blocks in which the effects beta will be conditiionally divided as p(beta_B|beta_\B,.)
 */
 // [[Rcpp::export]]
-void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G, double B) {
+void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::VectorXd cva) {
   int flag;
   moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
   flag=0;
   int N(Y.size());
   int M(X.cols());
-  VectorXd ones(N);
   VectorXd components(M);
-  Map<MatrixXd> xM(X.data(),N,M);
+
+  int K(cva.size()+1);
   ////////////validate inputs
-  if(B>1 || B<=0) /////////we validate the number of blocks
-  {
-    std::cout<<"error: prior is greater than 1 ";
-    return;
-  }
+
   if(max_iterations < burn_in || max_iterations<1 || burn_in<1) //validations related to mcmc burnin and iterations
   {
     std::cout<<"error: burn_in has to be a positive integer and smaller than the maximum number of iterations ";
@@ -107,19 +96,23 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     std::cout<<"error: hyper parameters have to be positive";
     //return;
   }
+  if((cva.array()==0).any() )//validations related to hyperparameters
+  {
+    std::cout<<"error: the zero component is already included in the model by default";
+    //return;
+  }
+  if((cva.array()<0).any() )//validations related to hyperparameters
+  {
+    std::cout<<"error: the variance of the components should be positive";
+    //return;
+  }
   /////end of declarations//////
-  ones.setOnes();
 
 
   Eigen::initParallel();
   Eigen::setNbThreads(10);
   double sum_beta_sqr;
-  std::cout<<" computing XtX\n";
-  std::chrono::high_resolution_clock::time_point startt= std::chrono::high_resolution_clock::now();
-  //xtX=AtA(xM);
-  std::chrono::high_resolution_clock::time_point stopt= std::chrono::high_resolution_clock::now();
-  auto durationt = std::chrono::duration_cast<std::chrono::seconds>( startt - stopt ).count();
-  std::cout << "crossproduct was computed in: "<<durationt << "s\n";
+
 
 #pragma omp parallel num_threads(2) shared(flag,q,M,N)
 {
@@ -128,50 +121,49 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
   {
 
-    double mu;
-    double sigmaG;
-    double sigmaE;
-    int m0;
-    // values near the mean are the most likely
-    // standard deviation affects the dispersion of generated values from the mean
-    Vector4d priorPi;
-    Vector4d pi;
-    Vector4d cVa;
-    MatrixXd beta(M,1);
+    //mean and residual variables
+    double mu; // mean or intercept
+    double sigmaG; //genetic variance
+    double sigmaE; // residuals variance
 
+    //component variables
+    VectorXd priorPi(K); // prior probabilities for each component
+    VectorXd pi(K); // mixture probabilities
+    VectorXd cVa(K); //component-specific variance
+    VectorXd logL(K); // log likelihood of component
+    VectorXd muk(K); // mean of k-th component marker effect size
+    VectorXd denom(K-1); // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
+    int m0; // total num ber of markes in model
+    VectorXd v(K); //variable storing the component assignment
+    VectorXd cVaI(K);// inverse of the component variances
 
-    Vector4d v;
-    Vector4d cVaI;
+    //linear model variables
+    MatrixXd beta(M,1); // effect sizes
+    VectorXd y_tilde(N); // variable containing the adjusted residuals to exclude the effects of a given marker
+    VectorXd epsilon(N); // variable containing the residuals
 
-    VectorXd y_tilde(N);
-    VectorXd epsilon(N);
-   // VectorXi markerI(M);
-    VectorXd sample(2*M+5);
+    //sampler variables
+    VectorXd sample(2*M+4); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
     std::vector<int> markerI;
     for (int i=0; i<M; ++i) {
       markerI.push_back(i);
     }
 
-    Vector4d logL;
-    Vector4d muk;
-    Vector3d denom;
+
     int marker;
     double acum;
 
-    priorPi[0]=B;
+    priorPi[0]=0.5;
 
 
 
-    priorPi.segment(1,3)=B*cVa.segment(1,3).segment(1,3).array()/cVa.segment(1,3).segment(1,3).sum();
+    priorPi.segment(1,(K-1))=priorPi[0]*cVa.segment(1,(K-1)).segment(1,(K-1)).array()/cVa.segment(1,(K-1)).segment(1,(K-1)).sum();
     y_tilde.setZero();
     cVa[0] = 0;
-    cVa[1] = 0.001;
-    cVa[2] = 0.01;
-    cVa[3] = 0.1;
-
+    cVa.segment(1,(K-1))=cva;
 
     cVaI[0] = 0;
-    cVaI.segment(1,cVaI.size()-1)=cVa.segment(1,cVaI.size()-1).cwiseInverse();
+    cVaI.segment(1,(K-1))=cVa.segment(1,(K-1)).cwiseInverse();
     //beta=beta.setRandom();
 
     //beta=(beta.array().abs() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
@@ -218,9 +210,9 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
        // std::cout<< muk;
         //we compute the denominator in the variance expression to save computations
-        denom=X.col(marker).squaredNorm()+(sigmaE/sigmaG)*cVaI.segment(1,3).array();
+        denom=X.col(marker).squaredNorm()+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
         //muk for the other components is computed according to equaitons
-        muk.segment(1,3)= (X.col(marker).cwiseProduct(y_tilde)).sum()/denom.array();
+        muk.segment(1,(K-1))= (X.col(marker).cwiseProduct(y_tilde)).sum()/denom.array();
 
 
 
@@ -243,8 +235,8 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
          */
 
         // Here we reproduce the fortran code
-        logL.segment(1,3)=logL.segment(1,3).array() - 0.5*((((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,3).array() + 1).array().log()))+
-          0.5*( muk.segment(1,3).array()*((X.col(marker).cwiseProduct(y_tilde)).sum()))/sigmaE;
+        logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,(K-1)).array() + 1).array().log()))+
+          0.5*( muk.segment(1,(K-1)).array()*((X.col(marker).cwiseProduct(y_tilde)).sum()))/sigmaE;
         //double rhs((X.col(marker).cwiseProduct(y_tilde)).sum());
          //logL.segment(1,3)=logL.segment(1,3).array() - 0.5*((((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,3).array() + 1).array().log()))+
          //0.5*( rhs*rhs/denom.array())/sigmaE;
@@ -255,13 +247,13 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
 
         //uncomment this next bit if you want also to estimate the probability of the zeroth component
-        if(((logL.segment(1,3).array()-logL[0]).abs().array() >700 ).any() ){
+        if(((logL.segment(1,(K-1)).array()-logL[0]).abs().array() >700 ).any() ){
          acum=0;
         }else{
           acum=1.0/((logL.array()-logL[0]).exp().sum());
         }
 
-        for(int k=0;k<4;k++){
+        for(int k=0;k<K;k++){
           if(p<=acum){
             if(k==0){
               beta(marker,0)=0;
@@ -273,11 +265,11 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
             components[marker]=k;
             break;
           }else{
-            if(((logL.segment(1,3).array()-logL[k+1]).abs().array() >700 ).any() ){
+            if(((logL.segment(1,(K-1)).array()-logL[k+1]).abs().array() >700 ).any() ){
               acum+=0;
             }
             else{
-              acum+=1.0/((logL.segment(1,3).array()-logL[k+1]).exp().sum());
+              acum+=1.0/((logL.segment(1,(K-1)).array()-logL[k+1]).exp().sum());//???
             }
           }
         }
@@ -289,22 +281,16 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
       sigmaG=inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
 
 
-      //std::cout<< "sigmaG: "<<sigmaG<<"\n";
-      //check if epsilon are the residues
       sigmaE=inv_scaled_chisq_rng(v0E+N,((epsilon).squaredNorm()+v0E*s02E)/(v0E+N));
-      //std::cout<< "sigmaE: "<<sigmaE<<"\n";
 
 
 
-      pi=dirichilet_rng(v+Vector4d::Ones());
+      pi=dirichilet_rng(v.array() + 1.0);
 
-      //std::cout<< "pi:"<<pi<<"\n";
-      sum_beta_sqr= (1.0/N)*(epsilon.array()-Y.array()).pow(2).sum() - pow((epsilon.array()-Y.array()).mean(),2);
-      //buffer << iteration<<"\n";//<<"\t"<< mu <<"\t"<< beta.col(1).transpose()<<"\t"<< sigmaG <<"\t"<<sigmaE <<"\t"<< components.transpose()<< "\n";
       if(iteration >= burn_in)
       {
         if(iteration % thinning == 0){
-          sample<< iteration,mu,beta,sigmaE,sigmaG,components, sum_beta_sqr;
+          sample<< iteration,mu,beta,sigmaE,sigmaG,components;
           q.enqueue(sample);
         }
 
@@ -323,7 +309,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
   queueFull=0;
   std::ofstream outFile;
   outFile.open(outputFile);
-  VectorXd sampleq(2*M+5);
+  VectorXd sampleq(2*M+4);
   IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
   outFile<< "iteration,"<<"mu,";
   for(unsigned int i = 0; i < M; ++i){
@@ -332,9 +318,9 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
   }
   outFile<<"sigmaE,"<<"sigmaG,";
   for(unsigned int i = 0; i < M; ++i){
-    outFile << "pred[" << (i+1) << "],";
+    outFile << "comp[" << (i+1) << "],";
   }
-  outFile<<"EV\n";
+  outFile<<"\n";
 
   while(!flag ){
     if(q.try_dequeue(sampleq))
