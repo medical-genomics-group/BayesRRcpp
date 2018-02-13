@@ -232,28 +232,7 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
-// spikeSlab
-void spikeSlab(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, Eigen::VectorXd cats, double v0E, double s02E, double v0L, double s02L, int B);
-RcppExport SEXP _BayesRRcpp_spikeSlab(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP catsSEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP v0LSEXP, SEXP s02LSEXP, SEXP BSEXP) {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
-    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
-    Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
-    Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
-    Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
-    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
-    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< Eigen::VectorXd >::type cats(catsSEXP);
-    Rcpp::traits::input_parameter< double >::type v0E(v0ESEXP);
-    Rcpp::traits::input_parameter< double >::type s02E(s02ESEXP);
-    Rcpp::traits::input_parameter< double >::type v0L(v0LSEXP);
-    Rcpp::traits::input_parameter< double >::type s02L(s02LSEXP);
-    Rcpp::traits::input_parameter< int >::type B(BSEXP);
-    spikeSlab(outputFile, seed, max_iterations, burn_in, thinning, X, Y, cats, v0E, s02E, v0L, s02L, B);
-    return R_NilValue;
-END_RCPP
-}
+
 
 static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_BayesRSamplerV2", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2, 13},
@@ -271,7 +250,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_mvn_rng", (DL_FUNC) &_BayesRRcpp_mvn_rng, 3},
     {"_BayesRRcpp_mvnCoef_rng", (DL_FUNC) &_BayesRRcpp_mvnCoef_rng, 5},
     {"_BayesRRcpp_RHorseshoeP", (DL_FUNC) &_BayesRRcpp_RHorseshoeP, 15},
-    {"_BayesRRcpp_spikeSlab", (DL_FUNC) &_BayesRRcpp_spikeSlab, 13},
     {NULL, NULL, 0}
 };
 
