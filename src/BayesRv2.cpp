@@ -243,10 +243,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
         double p(beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
-        //acum=pi(0);
 
-
-        //uncomment this next bit if you want also to estimate the probability of the zeroth component
         if(((logL.segment(1,(K-1)).array()-logL[0]).abs().array() >700 ).any() ){
          acum=0;
         }else{
@@ -269,7 +266,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
               acum+=0;
             }
             else{
-              acum+=1.0/((logL.array()-logL[k+1]).exp().sum());//???
+              acum+=1.0/((logL.array()-logL[k+1]).exp().sum());
             }
           }
         }
