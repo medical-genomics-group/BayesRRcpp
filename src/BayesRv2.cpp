@@ -125,6 +125,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     double mu; // mean or intercept
     double sigmaG; //genetic variance
     double sigmaE; // residuals variance
+    VectorXd sigmaGG(groups);
 
     //component variables
     MatrixXd priorPi(groups,K); // prior probabilities for each component
@@ -178,7 +179,8 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
 
    // sigmaG=(1*cVa).sum()/M;
-   sigmaG=beta_rng(1,1);
+   for(int i=0; i<groups;i++)
+    sigmaGG[i]=beta_rng(1,1);
 
     pi=priorPi;
 
@@ -204,9 +206,11 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
       for(int j=0; j < M; j++){
 
         marker= markerI[j];
+        sigmaG=sigmaGG[marker];
 
 
         y_tilde= epsilon.array()+(X.col(marker)*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
+
 
 
 
@@ -220,7 +224,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
 
 
-        logL= pi.row(gAssign(j)).array().log();//first component probabilities remain unchanged
+        logL= pi.row(gAssign(marker)).array().log();//first component probabilities remain unchanged
 
 
         //for the other three components I think that this is equivalent as in the fortran code:
