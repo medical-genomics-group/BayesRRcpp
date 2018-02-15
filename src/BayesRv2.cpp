@@ -220,7 +220,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
 
 
-        logL= pi.row(gAssign(j)).array().log();//first component probabilities remain unchanged
+        logL= pi.row(gAssign(marker)).array().log();//first component probabilities remain unchanged
 
 
         //for the other three components I think that this is equivalent as in the fortran code:
@@ -262,7 +262,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
               beta(marker,0)=norm_rng(muk[k],sigmaE/denom[k-1]);
               // beta(marker,0)=norm_rng(rhs/denom[k-1],sigmaE/denom[k-1]);
             }
-            v.row(gAssign(j))(k)+=1.0;
+            v.row(gAssign(marker))(k)+=1.0;
             components[marker]=k;
             break;
           }else{
