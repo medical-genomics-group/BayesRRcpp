@@ -144,7 +144,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     VectorXd epsilon(N); // variable containing the residuals
 
     //sampler variables
-    VectorXd sample(2*M+4); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
+    VectorXd sample(2*M+3+groups); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
     std::vector<int> markerI;
     for (int i=0; i<M; ++i) {
       markerI.push_back(i);
@@ -153,6 +153,8 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
     int marker;
     double acum;
+    VectorXd betaAcum(groups);
+
 
 
 
@@ -178,6 +180,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     mu=0;
 
 
+    betaAcum.setZero();
    // sigmaG=(1*cVa).sum()/M;
    for(int i=0; i<groups;i++)
     sigmaGG[i]=beta_rng(1,1);
@@ -203,10 +206,11 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
       m0=0;
       v.setZero();
+      betaAcum.setZero();
       for(int j=0; j < M; j++){
 
         marker= markerI[j];
-        sigmaG=sigmaGG[marker];
+        sigmaG=sigmaGG[gAssign(marker)];
 
 
         y_tilde= epsilon.array()+(X.col(marker)*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
@@ -264,9 +268,10 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
               beta(marker,0)=0;
             }else{
               beta(marker,0)=norm_rng(muk[k],sigmaE/denom[k-1]);
+              betaAcum(gAssign(marker))+= pow(beta(marker,0),2);
               // beta(marker,0)=norm_rng(rhs/denom[k-1],sigmaE/denom[k-1]);
             }
-            v.row(gAssign(j))(k)+=1.0;
+            v.row(gAssign(marker))(k)+=1.0;
             components[marker]=k;
             break;
           }else{
@@ -282,14 +287,14 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
       }
 
-      m0=M-v.col(0).sum();
-      sigmaG=inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
 
 
       sigmaE=inv_scaled_chisq_rng(v0E+N,((epsilon).squaredNorm()+v0E*s02E)/(v0E+N));
 
 
       for(int i=0; i<groups; i++){
+        m0=v.row(i).sum()-v.row(i)(0);
+        sigmaGG[i]=inv_scaled_chisq_rng(v0G+m0,(betaAcum(i)*m0+v0G*s02G)/(v0G+m0));
         pi.row(i)=dirichilet_rng(v.row(i).array() + 1.0);
 
       }
@@ -297,7 +302,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
       if(iteration >= burn_in)
       {
         if(iteration % thinning == 0){
-          sample<< iteration,mu,beta,sigmaE,sigmaG,components;
+          sample<< iteration,mu,beta,sigmaE,components,sigmaGG;
           q.enqueue(sample);
         }
 
@@ -316,16 +321,19 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
   queueFull=0;
   std::ofstream outFile;
   outFile.open(outputFile);
-  VectorXd sampleq(2*M+4);
+  VectorXd sampleq(2*M+3+groups);
   IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
   outFile<< "iteration,"<<"mu,";
   for(unsigned int i = 0; i < M; ++i){
     outFile << "beta[" << (i+1) << "],";
 
   }
-  outFile<<"sigmaE,"<<"sigmaG,";
+  outFile<<"sigmaE,";
   for(unsigned int i = 0; i < M; ++i){
     outFile << "comp[" << (i+1) << "],";
+  }
+  for(unsigned int i = 0; i < groups; ++i){
+    outFile << "sigmaG[" << (i+1) << "],";
   }
   outFile<<"\n";
 
