@@ -75,7 +75,7 @@ struct categorical_init
 * s02G- scale parameter of the prior inverse scaled chi-squared distribution over genetic effects variance
 */
 // [[Rcpp::export]]
-void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::VectorXd cva) {
+void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::VectorXd cva,int groups, Eigen::VectorXi gAssign) {
   int flag;
   moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
   flag=0;
@@ -127,14 +127,14 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     double sigmaE; // residuals variance
 
     //component variables
-    VectorXd priorPi(K); // prior probabilities for each component
-    VectorXd pi(K); // mixture probabilities
+    MatrixXd priorPi(groups,K); // prior probabilities for each component
+    MatrixXd pi(groups,K); // mixture probabilities
     VectorXd cVa(K); //component-specific variance
     VectorXd logL(K); // log likelihood of component
     VectorXd muk(K); // mean of k-th component marker effect size
     VectorXd denom(K-1); // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
     int m0; // total num ber of markes in model
-    VectorXd v(K); //variable storing the component assignment
+    MatrixXd v(groups,K); //variable storing the component assignment
     VectorXd cVaI(K);// inverse of the component variances
 
     //linear model variables
@@ -153,11 +153,15 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     int marker;
     double acum;
 
-    priorPi[0]=0.5;
 
 
 
-    priorPi.segment(1,(K-1))=priorPi[0]*cVa.segment(1,(K-1)).segment(1,(K-1)).array()/cVa.segment(1,(K-1)).segment(1,(K-1)).sum();
+    for(int i=0; i < groups; i++)
+    {
+      priorPi.row(i)(0)=0;
+      priorPi.row(i).segment(1,(K-1))=priorPi.row(i)(0)*cVa.segment(1,(K-1)).segment(1,(K-1)).array()/cVa.segment(1,(K-1)).segment(1,(K-1)).sum();
+    }
+
     y_tilde.setZero();
     cVa[0] = 0;
     cVa.segment(1,(K-1))=cva;
@@ -216,7 +220,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
 
 
-        logL= pi.array().log();//first component probabilities remain unchanged
+        logL= pi.row(gAssign(j)).array().log();//first component probabilities remain unchanged
 
 
         //for the other three components I think that this is equivalent as in the fortran code:
@@ -258,7 +262,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
               beta(marker,0)=norm_rng(muk[k],sigmaE/denom[k-1]);
               // beta(marker,0)=norm_rng(rhs/denom[k-1],sigmaE/denom[k-1]);
             }
-            v[k]+=1.0;
+            v.row(gAssign(j))(k)+=1.0;
             components[marker]=k;
             break;
           }else{
@@ -274,15 +278,17 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
       }
 
-      m0=M-v[0];
+      m0=M-v.col(0).sum();
       sigmaG=inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
 
 
       sigmaE=inv_scaled_chisq_rng(v0E+N,((epsilon).squaredNorm()+v0E*s02E)/(v0E+N));
 
 
+      for(int i=0; i<groups; i++){
+        pi.row(i)=dirichilet_rng(v.row(i).array() + 1.0);
 
-      pi=dirichilet_rng(v.array() + 1.0);
+      }
 
       if(iteration >= burn_in)
       {
