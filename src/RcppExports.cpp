@@ -28,6 +28,30 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// BayesRSamplerV2Groups
+void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double sigma0, double v0E, double s02E, double v0G, double s02G, Eigen::VectorXd cva, int groups, Eigen::VectorXi gAssign);
+RcppExport SEXP _BayesRRcpp_BayesRSamplerV2Groups(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP sigma0SEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP v0GSEXP, SEXP s02GSEXP, SEXP cvaSEXP, SEXP groupsSEXP, SEXP gAssignSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
+    Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
+    Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma0(sigma0SEXP);
+    Rcpp::traits::input_parameter< double >::type v0E(v0ESEXP);
+    Rcpp::traits::input_parameter< double >::type s02E(s02ESEXP);
+    Rcpp::traits::input_parameter< double >::type v0G(v0GSEXP);
+    Rcpp::traits::input_parameter< double >::type s02G(s02GSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type cva(cvaSEXP);
+    Rcpp::traits::input_parameter< int >::type groups(groupsSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXi >::type gAssign(gAssignSEXP);
+    BayesRSamplerV2Groups(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva, groups, gAssign);
+    return R_NilValue;
+END_RCPP
+}
 // dirichilet_rng
 Eigen::VectorXd dirichilet_rng(Eigen::VectorXd alpha);
 RcppExport SEXP _BayesRRcpp_dirichilet_rng(SEXP alphaSEXP) {
@@ -259,6 +283,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_BayesRSamplerV2", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2, 13},
+    {"_BayesRRcpp_BayesRSamplerV2Groups", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2Groups, 15},
     {"_BayesRRcpp_dirichilet_rng", (DL_FUNC) &_BayesRRcpp_dirichilet_rng, 1},
     {"_BayesRRcpp_inv_gamma_rng", (DL_FUNC) &_BayesRRcpp_inv_gamma_rng, 2},
     {"_BayesRRcpp_gamma_rng", (DL_FUNC) &_BayesRRcpp_gamma_rng, 2},
