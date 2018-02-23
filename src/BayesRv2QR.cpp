@@ -22,6 +22,8 @@ using Eigen::Map;
 using Eigen::Upper;
 typedef Map<MatrixXd> MapMatd;
 
+const static Eigen::IOFormat CSVFormat(StreamPrecision, DontAlignCols, ", ", "\n");
+
 
 template<typename Scalar>
 struct scalar_normal_dist_op
@@ -58,6 +60,22 @@ struct categorical_init
   const Scalar operator()(const Scalar& x) const{ return categorical(m_c); }
   Eigen::VectorXd m_c;
 };
+// [[Rcpp::export]]
+Eigen::MatrixXd QRdecompose(std::string outputFile,Eigen::MatrixXd X){
+  std::ofstream file(outputFile);
+  Eigen::MatrixXd Q;
+  std::cout<<" computing QR decomposition\n";
+  std::chrono::high_resolution_clock::time_point startt= std::chrono::high_resolution_clock::now();
+  Eigen::HouseholderQR<MatrixXd> qr(X);
+  Q = qr.householderQ();
+  std::chrono::high_resolution_clock::time_point stopt= std::chrono::high_resolution_clock::now();
+  auto durationt = std::chrono::duration_cast<std::chrono::seconds>( startt - stopt ).count();
+  std::cout << "QR decomposition was computed in: "<<durationt << "s\n";
+
+
+  file << Q.format(CSVFormat);
+  return Q;
+}
 
 /*
 * Bayes R sampler
