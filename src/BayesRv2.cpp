@@ -143,7 +143,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     VectorXd epsilon(N); // variable containing the residuals
 
     //sampler variables
-    VectorXd sample(2*M+4); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
+    VectorXd sample(2*M+4+N); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
     std::vector<int> markerI;
     for (int i=0; i<M; ++i) {
       markerI.push_back(i);
@@ -287,7 +287,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
       if(iteration >= burn_in)
       {
         if(iteration % thinning == 0){
-          sample<< iteration,mu,beta,sigmaE,sigmaG,components;
+          sample<< iteration,mu,beta,sigmaE,sigmaG,components,epsilon;
           q.enqueue(sample);
         }
 
@@ -306,7 +306,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
   queueFull=0;
   std::ofstream outFile;
   outFile.open(outputFile);
-  VectorXd sampleq(2*M+4);
+  VectorXd sampleq(2*M+4+N);
   IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
   outFile<< "iteration,"<<"mu,";
   for(unsigned int i = 0; i < M; ++i){
@@ -316,6 +316,9 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
   outFile<<"sigmaE,"<<"sigmaG,";
   for(unsigned int i = 0; i < M; ++i){
     outFile << "comp[" << (i+1) << "],";
+  }
+  for(unsigned int i = 0; i < N; ++i){
+    outFile << "epsilon[" << (i+1) << "],";
   }
   outFile<<"\n";
 
