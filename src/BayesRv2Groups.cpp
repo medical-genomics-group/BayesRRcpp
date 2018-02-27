@@ -144,7 +144,7 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
     VectorXd epsilon(N); // variable containing the residuals
 
     //sampler variables
-    VectorXd sample(2*M+3+groups); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
+    VectorXd sample(2*M+3+groups+N); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
     std::vector<int> markerI;
     for (int i=0; i<M; ++i) {
       markerI.push_back(i);
@@ -211,7 +211,11 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
 
           marker= markerI[j];
           sigmaG=sigmaGG[gAssign(marker)];
-
+          /// quick fix for the methylation data
+          if(gAssign(marker==1)){
+            cVa.segment(1,(K-1))=100*cVa.segment(1,(K-1));
+            cVaI.segment(1,(K-1))=0.01*cVaI.segment(1,(K-1));
+          }
 
           y_tilde= epsilon.array()+(X.col(marker)*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
 
@@ -285,6 +289,11 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
           }
           epsilon=y_tilde-X.col(marker)*beta(marker,0);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
 
+          //quick fix for the methylation data
+          if(gAssign(marker==1)){
+            cVa.segment(1,(K-1))=0.01*cVa.segment(1,(K-1));
+            cVaI.segment(1,(K-1))=100*cVaI.segment(1,(K-1));
+          }
         }
 
 
@@ -302,7 +311,7 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
         if(iteration >= burn_in)
         {
           if(iteration % thinning == 0){
-            sample<< iteration,mu,beta,sigmaE,components,sigmaGG;
+            sample<< iteration,mu,beta,sigmaE,components,sigmaGG,epsilon;
             q.enqueue(sample);
           }
 
@@ -321,7 +330,7 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
   queueFull=0;
   std::ofstream outFile;
   outFile.open(outputFile);
-  VectorXd sampleq(2*M+3+groups);
+  VectorXd sampleq(2*M+3+groups+N);
   IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
   outFile<< "iteration,"<<"mu,";
   for(unsigned int i = 0; i < M; ++i){
@@ -334,6 +343,9 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
   }
   for(unsigned int i = 0; i < groups; ++i){
     outFile << "sigmaG[" << (i+1) << "],";
+  }
+  for(unsigned int i = 0; i < N; ++i){
+    outFile << "epsilon[" << (i+1) << "],";
   }
   outFile<<"\n";
 
