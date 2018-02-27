@@ -5,6 +5,18 @@ BayesRSamplerV2 <- function(outputFile, seed, max_iterations, burn_in, thinning,
     invisible(.Call(`_BayesRRcpp_BayesRSamplerV2`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva))
 }
 
+BayesRSamplerV2Groups <- function(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva, groups, gAssign) {
+    invisible(.Call(`_BayesRRcpp_BayesRSamplerV2Groups`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva, groups, gAssign))
+}
+
+QRdecompose <- function(outputFile, X) {
+    .Call(`_BayesRRcpp_QRdecompose`, outputFile, X)
+}
+
+BayesRSamplerV2QR <- function(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva) {
+    invisible(.Call(`_BayesRRcpp_BayesRSamplerV2QR`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva))
+}
+
 dirichilet_rng <- function(alpha) {
     .Call(`_BayesRRcpp_dirichilet_rng`, alpha)
 }
