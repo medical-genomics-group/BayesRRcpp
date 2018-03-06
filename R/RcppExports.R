@@ -57,6 +57,10 @@ HorseshoePlus <- function(outputFile, seed, max_iterations, burn_in, thinning, X
     invisible(.Call(`_BayesRRcpp_HorseshoePlus`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, A, v0E, s02E, vL, vT, B, c2))
 }
 
+HorseshoePlusv2 <- function(outputFile, seed, max_iterations, burn_in, thinning, X, Y, A, v0E, s02E, vL, vT, B, c2) {
+    invisible(.Call(`_BayesRRcpp_HorseshoePlusv2`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, A, v0E, s02E, vL, vT, B, c2))
+}
+
 sumDiagonal <- function(Ma, va) {
     .Call(`_BayesRRcpp_sumDiagonal`, Ma, va)
 }
