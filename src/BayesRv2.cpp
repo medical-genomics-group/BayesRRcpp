@@ -177,7 +177,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
     components.setZero();
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-    epsilon= Y.array() - mu - (X*beta).array();
+    epsilon= Y.array() - mu;
     sigmaE=epsilon.squaredNorm()/N*0.5;
     xsquared=X.colwise().squaredNorm();
     for(int iteration=0; iteration < max_iterations; iteration++){

@@ -33,10 +33,14 @@ library(BayesRRcpp)
 
 
 
+The code we are interested in optimize is in the file
+
+BayesRRcpp/src/BayesRv2.cpp
+
 Then for the standard BayesR model we have the function
 
 ```{bash,eval=F}
-BayesRSampler(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G, int B)
+BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G, Eigen::VectorXd cva)
 ```
 
 where 
@@ -61,12 +65,10 @@ v0E,s02E=  degrees of freedom and variance of the prior scaled inverse chi squar
 
 v0G,s02G=  degrees of freedom and variance of the prior scaled inverse chi square distribution over $\sigma_{G}$, set to a weakly informative value of 0.01
 
-B = number of blocks in which the random effects will be sampled, for example for 1000 effects, a value B of 10 will involve 10 blocks of 100 effects conditionally drawn from a multivariate normal, which will involve a cholesky decomposition of a 100X100 matrix. We are reducing the size of matrix inversion in exchange of more computation (more matrix multiplications and more matrix inversions).
-
-Additional note: The current implementation relies on preprocessing and storing on memory the scatter matrix $ X^TX$. It is possible to evaluate this matrix block by block during sampling, thus reducing memory consumption but greatly increasing processing required. Depending on the performance tests we may chose one or the other.
+cva= vector containing the component variances.
 
 
-```{r,message=F,warning=F}
+```{r,message=F,warning=F,eval=F}
 library(BayesRRcpp)
 M=100
 N=1000
@@ -97,9 +99,8 @@ B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
       X=scale(X)
        BayesRSampler("test2.csv",1, 30000, 29000,1,X, Y,0.01,0.01,0.01,0.01,0.01,2)
        library(readr)
-       tmp <- read_csv("./test2.csv")
-        #names(tmp)
-        #plot(tmp$sigmaG); mean(tmp$sigmaG)
+       
+       
        plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
         lines(B,B)
         abline(h=0)
@@ -147,15 +148,15 @@ mkdir ~/.R
 and create a Makevars file telling R to compile using  C++11 and support for multi threading
 
 ```{bash,eval=F}
-echo 'CXXFLAGS += -std=gnu++11 -fopenmp'> ~/.R/Makevars
+echo 'CXXFLAGS += -march=native -O3 -std=c++11 -fopenmp'> ~/.R/Makevars
 ```
 
 finally change to the PARENT DIRECTORY in which BayesRRcpp is contained, for example, if BayesRRcpp is in ~/repo/BayesRRcpp change to ~/repo/
 
-there execute
+there (if in vital-it) execute
 
 ```{bash,eval=F}
-module add R/3.3.2
+module add R
 ```
 
 now you can start your R session
@@ -220,3 +221,23 @@ CPPFLAGS tell us to use C++11 openmp and the header files from Xcode.
 LDFLAGS tell us to use the lib files from llvm.
 
 hopefully set up wont vary much depending on your OSX version.
+
+## Desired behaviour
+
+Currently our implementations depends on storing the matrix X and Y on memory. If we wish to run many chains in parallel each chain has a copy of both matrices. For the data sets we are interested (N>5000,M>500000), this amounts to huge space in memory. 
+
+We wish a function:
+
+```{bash,eval=F}
+BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, std::string XmatrixFile, std::string YmatrixFile,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::VectorXd cva)
+```
+
+- Instead of loading the matrix X on memory we rely on a memory mapped file.
+- Matrix Y is only used once at the begining of sampling, so ideally it should be loaded into memory and freed after sampling starts.
+- If runnig multiple chains in parallel they should access the same memory mapped file, thus i/o sincronization may be needed (this requirement is not so important, we wish to save memory consumption so there may be other soulutions)
+- We usually work with the scaled and centered X matrix, that means that X each column of X should have its mean substracted and the result divided by the column's standard deviation. this can be performed during sampling, but we would need to compute the columns mean and sd before sampling and storing the values in memory (not so important as this can be done as preprocessing, but would be very desirable)
+- In the 
+
+
+
+
