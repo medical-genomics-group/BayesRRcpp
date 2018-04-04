@@ -133,6 +133,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     VectorXd logL(K); // log likelihood of component
     VectorXd muk(K); // mean of k-th component marker effect size
     VectorXd denom(K-1); // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
+    double num;//storing dot product
     int m0; // total num ber of markes in model
     VectorXd v(K); //variable storing the component assignment
     VectorXd cVaI(K);// inverse of the component variances
@@ -141,6 +142,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     MatrixXd beta(M,1); // effect sizes
     VectorXd y_tilde(N); // variable containing the adjusted residuals to exclude the effects of a given marker
     VectorXd epsilon(N); // variable containing the residuals
+    VectorXd xsquared(M); //variable containing the squared norm of the X columns
 
     //sampler variables
     VectorXd sample(2*M+4+N); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
@@ -164,17 +166,12 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
     cVaI[0] = 0;
     cVaI.segment(1,(K-1))=cVa.segment(1,(K-1)).cwiseInverse();
-    //beta=beta.setRandom();
 
-    //beta=(beta.array().abs() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
     beta.setZero();
 
-    //mu=norm_rng(0,1);
     mu=0;
 
-
-   // sigmaG=(1*cVa).sum()/M;
-   sigmaG=beta_rng(1,1);
+    sigmaG=beta_rng(1,1);
 
     pi=priorPi;
 
@@ -182,6 +179,7 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     epsilon= Y.array() - mu - (X*beta).array();
     sigmaE=epsilon.squaredNorm()/N*0.5;
+    xsquared=X.colwise().squaredNorm();
     for(int iteration=0; iteration < max_iterations; iteration++){
 
       if(iteration>0)
@@ -210,36 +208,19 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
        // std::cout<< muk;
         //we compute the denominator in the variance expression to save computations
-        denom=X.col(marker).squaredNorm()+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
+        denom=xsquared(marker)+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
+        //we compute the dot product to save computations
+        num=(X.col(marker).cwiseProduct(y_tilde)).sum();
         //muk for the other components is computed according to equaitons
-        muk.segment(1,(K-1))= (X.col(marker).cwiseProduct(y_tilde)).sum()/denom.array();
+        muk.segment(1,(K-1))= num/denom.array();
 
 
 
         logL= pi.array().log();//first component probabilities remain unchanged
 
 
-        //for the other three components I think that this is equivalent as in the fortran code:
-        //s(kk)=-0.5d0*(logdetV-(rhs*uhat/vare))+log_p(sidx,kk)
-
-        /*
-        logL.segment(1,3)=logL.segment(1,3).array() - 0.5*((double)N*log(sigmaE)+(((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,3).array() + 1).array().log())).abs()+
-                  0.5*(y_tilde.squaredNorm() - muk.segment(1,3).array()*((X.col(marker).cwiseProduct(y_tilde)).squaredNorm()))/sigmaE;
-
-         */
-
-        //here we change also the probability of the first component
-        /*
-        logL=logL.array() - 0.5*((double)N*log(sigmaE)+(((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.array() + 1).array().log())).abs()+
-          0.5*(y_tilde.squaredNorm() - muk.array()*((X.col(marker).cwiseProduct(y_tilde)).squaredNorm()))/sigmaE;
-         */
-
-        // Here we reproduce the fortran code
-        logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,(K-1)).array() + 1).array().log()))+
-          0.5*( muk.segment(1,(K-1)).array()*((X.col(marker).cwiseProduct(y_tilde)).sum()))/sigmaE;
-        //double rhs((X.col(marker).cwiseProduct(y_tilde)).sum());
-         //logL.segment(1,3)=logL.segment(1,3).array() - 0.5*((((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,3).array() + 1).array().log()))+
-         //0.5*( rhs*rhs/denom.array())/sigmaE;
+        //update the log likelihood for each component
+        logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(xsquared(marker)))*cVa.segment(1,(K-1)).array() + 1).array().log()) + 0.5*( muk.segment(1,(K-1)).array()*num)/sigmaE;
 
         double p(beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
@@ -252,16 +233,17 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
 
         for(int k=0;k<K;k++){
           if(p<=acum){
+            //if zeroth component
             if(k==0){
               beta(marker,0)=0;
             }else{
               beta(marker,0)=norm_rng(muk[k],sigmaE/denom[k-1]);
-              // beta(marker,0)=norm_rng(rhs/denom[k-1],sigmaE/denom[k-1]);
             }
             v[k]+=1.0;
             components[marker]=k;
             break;
           }else{
+            //if too big or too small
             if(((logL.segment(1,(K-1)).array()-logL[k+1]).abs().array() >700 ).any() ){
               acum+=0;
             }
