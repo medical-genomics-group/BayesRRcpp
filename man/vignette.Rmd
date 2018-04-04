@@ -2,17 +2,15 @@
 title: "small manual"
 author: "Daniel Trejo Banos"
 date: "05/12/2017"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ## Current Bayes R implementation
 
-The current package prototype is an implementation of Bayes R (citation ). It was developed in C++ 11.0 with interface to R through Rcpp. For numeric and matrix computations the library Eigen was used, along with it's R interface. The implementation has the following caveats:
+The current package prototype is an implementation of Bayes R (citation ). It was developed in C++ 11.0 with interface to R through Rcpp. For numeric and matrix computations the library Eigen was used, along with it's R interface. The algorithm runs a chain  of BayesR using two threads, a sampling thread that computes a sample of the Markov chain and stores it in a concurrent queue, and a consumer thread that reads samples from the queue and saves them into a csv file.
 
-- the random effects coefficients are sampled from four distributions in a mixture. the mixture variances are 0, 0.01, 0.001 and 0.0001 times the parameter $\sigma_{G}$. for now, the mixture components are hardcoded as 0, 0.01, 0.001 and 0.0001, but that can be changed as an additional parameter in the near future.
-- the random effects are sampled all at once, by performing the cholesky decomposition of the matrix $X'X+D$ where D is the diagonal matrix containing the mixture variances. Said decomposition has a $\mathcal{O}\left( M^3\right)$ complexity (where M is the number of effects). There are many ways to reduce said complexity, like conditioning in subsets of effects or augmented variable sampling(none which has been implemented yet).
-- Even though the function contains parameters for burnin time and thinning, the functionality hasnt been implemented yet, so you will be returned the total numner of samples given by the argument max_iterations. 
-- It is contemplated to have a parallel process storing the samples in a file while the sampler does his thing, this functionality will be implemented very soon, but meanwhile, keep in mind that ALL the samples will be sotred into memory.
 
 Having said that, proceed as following after having cloned the repository, go to the project folder and run:
 
@@ -67,47 +65,31 @@ v0G,s02G=  degrees of freedom and variance of the prior scaled inverse chi squar
 
 cva= vector containing the component variances.
 
+You can execute the following script to test the performance of the model.
 
-```{r,message=F,warning=F,eval=F}
+```{r,message=F,warning=F}
 library(BayesRRcpp)
-M=100
-N=1000
-B=matrix(rnorm(M,sd=0.1),ncol=1)
-B[sample(1:100,30),1]=0#we randomly set 30 effects to zero
-  X <- matrix(rnorm(M*N), N, M)
-  Y=X%*%B+rnorm(N,sd=0.1)
- ## seems that scaling is detrimental to the fit when there are some zero coefficients?
-  # Y=scale(Y)
-  #X=scale(X)
 
- BayesRSampler("./test1.csv",1, 30000, 29000,1,X, Y,0.01,0.01,0.01,0.01,0.01,10)
-       library(readr)
-       tmp <- read_csv("./test1.csv")
-        #names(tmp)
-        #plot(tmp$sigmaG); mean(tmp$sigmaG)
-       plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
-        lines(B,B)
-        abline(h=0)
-
-M=100
-N=2000
-B=matrix(rnorm(M,sd=sqrt(0.5/M)),ncol=1)
-  X <- matrix(rnorm(M*N), N, M); var(X[,1])
-    G <- X%*%B; var(G)
-      Y=X%*%B+rnorm(N,sd=sqrt(1-var(G))); var(Y)
-      Y=scale(Y)
-      X=scale(X)
-       BayesRSampler("test2.csv",1, 30000, 29000,1,X, Y,0.01,0.01,0.01,0.01,0.01,2)
-       library(readr)
+MT = 6000
+N = 4000
+M1 = 900
+M2= 100
+X <- matrix(rbinom(n=MT*N, 2, .5), ncol=MT)
+b <- c(rnorm(M1,0,sqrt(0.01/(M1))),rnorm(M2,0,sqrt(0.49/(M2))),rep(0,(MT-(M1+M2))))
+g <- scale(X) %*% b; var(g)
+e <- rnorm(N,0, sd=sqrt(var(g)))
+y <- g+e
+BayesRSamplerV2("test.csv",1, 15000, 10000,5,scale(X), scale(y),0.01,0.01,0.01,0.01,0.01,c(0.0001,0.001,0.01))
+library(readr)
+tmp<-read.csv("test.csv")
        
-       
-       plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
-        lines(B,B)
-        abline(h=0)
-         var(G)
-        mean(tmp$EV)
-         1-var(G)
-         mean(tmp$sigmaE)
+plot(b,sd(y)*colMeans(tmp[,grep("beta",names(tmp))]))
+lines(b,b)
+abline(h=0)
+var(g)
+mean(tmp$sigmaG)
+1-var(g)
+mean(tmp$sigmaE)
          
 ```
 
@@ -125,13 +107,13 @@ pi= mixing proportions $\pi$
 
 mu= random intercept parameter $\mu$
 
-EV = explained variance as computed: $\mathrm{var} \left(X\beta\right)$ , for each sample of $\beta$ 
+sigmaG = explained variance as computed: $\mathrm{var} \left(X\beta\right)$ , for each sample of $\beta$ 
 
 each row contains a post burn_in set of samples for the variables.
 
 ## Installation on cluster
 
-to install the package on the cluster:
+to install the package on the vital-it cluster:
 
 go to your home directory (~/) and create a directory for the repository, then use git (already installed as part of vital it)
 
@@ -175,7 +157,7 @@ install.packages("RcppEigen")
 
 ```
 
-close your R session, and exectue the following command
+close your R session, and exectue the following command in the same directory your BayesRRcpp folder is
 
 ```{bash,eval=F}
 R CMD build BayesRRcpp
@@ -232,11 +214,31 @@ We wish a function:
 BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, std::string XmatrixFile, std::string YmatrixFile,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::VectorXd cva)
 ```
 
-- Instead of loading the matrix X on memory we rely on a memory mapped file.
+- Instead of loading the matrix X on memory we rely on a memory mapped file. The user would give the name of the file containing matrix X in comma-separated .csv files.
 - Matrix Y is only used once at the begining of sampling, so ideally it should be loaded into memory and freed after sampling starts.
 - If runnig multiple chains in parallel they should access the same memory mapped file, thus i/o sincronization may be needed (this requirement is not so important, we wish to save memory consumption so there may be other soulutions)
 - We usually work with the scaled and centered X matrix, that means that X each column of X should have its mean substracted and the result divided by the column's standard deviation. this can be performed during sampling, but we would need to compute the columns mean and sd before sampling and storing the values in memory (not so important as this can be done as preprocessing, but would be very desirable)
-- In the 
+- In the source code, the matrix X is called in the following lines before sampling
+
+```{rcpp,eval=F}
+xsquared=X.colwise().squaredNorm();
+```
+where the squared norm of each column is computed and stored in an array. this could be performend in parallel, or using the eigen's templated algorithms. Either way this would need to be performed over the memory mapped file.
+
+- the matrix X is used in the following lines during sampling
+
+```{rcpp,eval=F}
+     y_tilde= epsilon.array()+(X.col(marker)*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
+
+    num=(X.col(marker).cwiseProduct(y_tilde)).sum();
+    
+     epsilon=y_tilde-X.col(marker)*beta(marker,0);
+
+```
+
+in the code above, the current column is given by the variable "marker", which is extracted from a vector containing a random shuffle of the column indexes.
+
+The main goal would be to perform these operations using the memory mapped file instead of reading matrix X from memory, other options would be to have a buffer of columns for reading these columns. The desirable implementation would achieve a balance between processing time and memory consumption.
 
 
 
