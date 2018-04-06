@@ -75,7 +75,7 @@ struct categorical_init
 * s02G- scale parameter of the prior inverse scaled chi-squared distribution over genetic effects variance
 */
 // [[Rcpp::export]]
-void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::VectorXd cva,int groups, Eigen::VectorXi gAssign) {
+void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::MatrixXd cva,int groups, Eigen::VectorXi gAssign) {
   int flag;
   moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
   flag=0;
@@ -83,7 +83,7 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
   int M(X.cols());
   VectorXd components(M);
 
-  int K(cva.size()+1);
+  int K(cva.cols()+1);
   ////////////validate inputs
 
   if(max_iterations < burn_in || max_iterations<1 || burn_in<1) //validations related to mcmc burnin and iterations
@@ -149,7 +149,8 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
     for (int i=0; i<M; ++i) {
       markerI.push_back(i);
     }
-
+    VectorXd xsquared(M);
+    double num;
 
     int marker;
     double acum;
@@ -166,11 +167,11 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
     }
 
     y_tilde.setZero();
-    cVa[0] = 0;
-    cVa.segment(1,(K-1))=cva;
+    //cVa[0] = 0;
+    //cVa.segment(1,(K-1))=cva;
 
-    cVaI[0] = 0;
-    cVaI.segment(1,(K-1))=cVa.segment(1,(K-1)).cwiseInverse();
+    //cVaI[0] = 0;
+    //cVaI.segment(1,(K-1))=cVa.segment(1,(K-1)).cwiseInverse();
     //beta=beta.setRandom();
 
     //beta=(beta.array().abs() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
@@ -189,8 +190,9 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
 
     components.setZero();
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-    epsilon= Y.array() - mu - (X*beta).array();
+    epsilon= Y.array() - mu;
     sigmaE=epsilon.squaredNorm()/N*0.5;
+    xsquared=X.colwise().squaredNorm();
     for(int iteration=0; iteration < max_iterations; iteration++){
 
       if(iteration>0)
@@ -211,11 +213,12 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
 
           marker= markerI[j];
           sigmaG=sigmaGG[gAssign(marker)];
-          /// quick fix for the methylation data
-          if(gAssign(marker==1)){
-            cVa.segment(1,(K-1))=100*cVa.segment(1,(K-1));
-            cVaI.segment(1,(K-1))=0.01*cVaI.segment(1,(K-1));
-          }
+
+          cVa[0]=0;
+          cVaI[0]=0;
+          cVa.segment(1,(K-1))=cva.row(gAssign(marker));
+          cVaI.segment(1,(K-1))=(cVa.segment(1,(K-1))).cwiseInverse();
+
 
           y_tilde= epsilon.array()+(X.col(marker)*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
 
@@ -226,36 +229,19 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
 
           // std::cout<< muk;
           //we compute the denominator in the variance expression to save computations
-          denom=X.col(marker).squaredNorm()+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
+          denom=xsquared(marker)+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
           //muk for the other components is computed according to equaitons
-          muk.segment(1,(K-1))= (X.col(marker).cwiseProduct(y_tilde)).sum()/denom.array();
+          num=(X.col(marker).cwiseProduct(y_tilde)).sum();
+          muk.segment(1,(K-1))= num/denom.array();
 
 
 
           logL= pi.row(gAssign(marker)).array().log();//first component probabilities remain unchanged
 
 
-          //for the other three components I think that this is equivalent as in the fortran code:
-          //s(kk)=-0.5d0*(logdetV-(rhs*uhat/vare))+log_p(sidx,kk)
-
-          /*
-          logL.segment(1,3)=logL.segment(1,3).array() - 0.5*((double)N*log(sigmaE)+(((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,3).array() + 1).array().log())).abs()+
-          0.5*(y_tilde.squaredNorm() - muk.segment(1,3).array()*((X.col(marker).cwiseProduct(y_tilde)).squaredNorm()))/sigmaE;
-
-          */
-
-          //here we change also the probability of the first component
-          /*
-          logL=logL.array() - 0.5*((double)N*log(sigmaE)+(((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.array() + 1).array().log())).abs()+
-          0.5*(y_tilde.squaredNorm() - muk.array()*((X.col(marker).cwiseProduct(y_tilde)).squaredNorm()))/sigmaE;
-          */
-
           // Here we reproduce the fortran code
-          logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,(K-1)).array() + 1).array().log()))+
-            0.5*( muk.segment(1,(K-1)).array()*((X.col(marker).cwiseProduct(y_tilde)).sum()))/sigmaE;
-          //double rhs((X.col(marker).cwiseProduct(y_tilde)).sum());
-          //logL.segment(1,3)=logL.segment(1,3).array() - 0.5*((((sigmaG/sigmaE)*(X.col(marker).squaredNorm())*cVa.segment(1,3).array() + 1).array().log()))+
-          //0.5*( rhs*rhs/denom.array())/sigmaE;
+          logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(xsquared(marker))*cVa.segment(1,(K-1)).array() + 1).array().log()))+
+            0.5*( muk.segment(1,(K-1)).array()*num)/sigmaE;
 
           double p(beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
@@ -289,11 +275,7 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
           }
           epsilon=y_tilde-X.col(marker)*beta(marker,0);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
 
-          //quick fix for the methylation data
-          if(gAssign(marker==1)){
-            cVa.segment(1,(K-1))=0.01*cVa.segment(1,(K-1));
-            cVaI.segment(1,(K-1))=100*cVaI.segment(1,(K-1));
-          }
+
         }
 
 
