@@ -115,6 +115,25 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// BRV2PPGroups
+void BRV2PPGroups(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::VectorXd mu, Eigen::MatrixXd beta, Eigen::VectorXd sigmaE, Eigen::MatrixXd X, Eigen::VectorXd y);
+RcppExport SEXP _BayesRRcpp_BRV2PPGroups(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP muSEXP, SEXP betaSEXP, SEXP sigmaESEXP, SEXP XSEXP, SEXP ySEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
+    Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
+    Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type sigmaE(sigmaESEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type y(ySEXP);
+    BRV2PPGroups(outputFile, seed, max_iterations, burn_in, thinning, mu, beta, sigmaE, X, y);
+    return R_NilValue;
+END_RCPP
+}
 // dirichilet_rng
 Eigen::VectorXd dirichilet_rng(Eigen::VectorXd alpha);
 RcppExport SEXP _BayesRRcpp_dirichilet_rng(SEXP alphaSEXP) {
@@ -373,6 +392,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_QRdecompose", (DL_FUNC) &_BayesRRcpp_QRdecompose, 2},
     {"_BayesRRcpp_BayesRSamplerV2QR", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2QR, 13},
     {"_BayesRRcpp_BRV2Grstart", (DL_FUNC) &_BayesRRcpp_BRV2Grstart, 20},
+    {"_BayesRRcpp_BRV2PPGroups", (DL_FUNC) &_BayesRRcpp_BRV2PPGroups, 10},
     {"_BayesRRcpp_dirichilet_rng", (DL_FUNC) &_BayesRRcpp_dirichilet_rng, 1},
     {"_BayesRRcpp_inv_gamma_rng", (DL_FUNC) &_BayesRRcpp_inv_gamma_rng, 2},
     {"_BayesRRcpp_gamma_rng", (DL_FUNC) &_BayesRRcpp_gamma_rng, 2},

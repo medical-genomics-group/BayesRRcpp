@@ -17,6 +17,14 @@ BayesRSamplerV2QR <- function(outputFile, seed, max_iterations, burn_in, thinnin
     invisible(.Call(`_BayesRRcpp_BayesRSamplerV2QR`, outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva))
 }
 
+BRV2Grstart <- function(outputFile, seed, max_iterations, burn_in, thinning, mu, beta, sigmaE, sigmaGG, X, epsilon, components, sigma0, v0E, s02E, v0G, s02G, cva, groups, gAssign) {
+    invisible(.Call(`_BayesRRcpp_BRV2Grstart`, outputFile, seed, max_iterations, burn_in, thinning, mu, beta, sigmaE, sigmaGG, X, epsilon, components, sigma0, v0E, s02E, v0G, s02G, cva, groups, gAssign))
+}
+
+BRV2PPGroups <- function(outputFile, seed, max_iterations, burn_in, thinning, mu, beta, sigmaE, X, y) {
+    invisible(.Call(`_BayesRRcpp_BRV2PPGroups`, outputFile, seed, max_iterations, burn_in, thinning, mu, beta, sigmaE, X, y))
+}
+
 dirichilet_rng <- function(alpha) {
     .Call(`_BayesRRcpp_dirichilet_rng`, alpha)
 }
