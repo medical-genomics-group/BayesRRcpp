@@ -83,6 +83,8 @@ int BayesRRm::runGibbs(){
 			     int marker;
 			     double acum;
 
+			     VectorXd y;
+			     VectorXd X;
 			     priorPi[0]=0.5;
 
 
@@ -105,7 +107,8 @@ int BayesRRm::runGibbs(){
 
 			     components.setZero();
 			     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-			     epsilon= data.y.array() - mu;
+			     y=(data.y).cast<double>();
+			     epsilon= (y).array() - mu;
 			     sigmaE=epsilon.squaredNorm()/N*0.5;
 
 			     for(int iteration=0; iteration < max_iterations; iteration++){
@@ -127,8 +130,9 @@ int BayesRRm::runGibbs(){
 
 			         marker= markerI[j];
 			         data.getSnpDataFromBedFileUsingMmap(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
+			         X=normedSnpData.cast<double>();
 
-			         y_tilde= epsilon.array()+(normedSnpData*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
+			         y_tilde= epsilon.array()+(X*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
 
 
 
@@ -136,9 +140,9 @@ int BayesRRm::runGibbs(){
 
 			        // std::cout<< muk;
 			         //we compute the denominator in the variance expression to save computations
-			         denom=data.ZPZdiag[marker]+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
+			         denom=(double)data.ZPZdiag[marker]+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
 			         //we compute the dot product to save computations
-			         num=(normedSnpData.cwiseProduct(y_tilde)).sum();
+			         num=(X.cwiseProduct(y_tilde)).sum();
 			         //muk for the other components is computed according to equaitons
 			         muk.segment(1,(K-1))= num/denom.array();
 
@@ -180,7 +184,7 @@ int BayesRRm::runGibbs(){
 			             }
 			           }
 			         }
-			        epsilon=y_tilde-normedSnpData*beta(marker,0);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
+			        epsilon=y_tilde-X*beta(marker,0);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
 
 			       }
 
