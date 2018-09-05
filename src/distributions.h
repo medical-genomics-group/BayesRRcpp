@@ -2,7 +2,7 @@
 #define distributions_H
 
 #include <Rcpp.h>
-#include <RcppEigen.h>
+#include <Eigen>
 #include <random>
 
 
