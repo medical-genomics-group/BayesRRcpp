@@ -1,11 +1,12 @@
 #include <Rcpp.h>
-#include <RcppEigen.h>
+#include <Eigen>
 #include <random>
 #include <math.h>
+#include <R.h>
 #include "distributions.h"
 // [[Rcpp::depends(RcppEigen)]]
 using namespace Rcpp;
-using namespace RcppEigen;
+//using namespace RcppEigen;
 using Eigen::VectorXd;
 // This is a simple example of exporting a C++ function to R. You can
 // source this function into an R session using the Rcpp::sourceCpp
