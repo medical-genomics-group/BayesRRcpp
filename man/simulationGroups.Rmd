@@ -25,13 +25,14 @@ require(BayesRRcpp)
 require(bindata)
 require(readr)
 
-MT = 2000
+MT = 6000
 N = 4000
 M1 = 900
 M2= 100
+M3=2
 X <- matrix(rbinom(n=MT*N, 2, .5), ncol=MT)
 X1 <- X
-b <- c(rnorm(M1,0,sqrt(0.01/(M1))),rnorm(M2,0,sqrt(0.49/(M2))),rep(0,(MT-(M1+M2))))
+b <- c(rnorm(M1,0,sqrt(0.1/(M1))),rnorm(M2,0,sqrt(0.48/(M2))),rnorm(M3,0,sqrt(0.1/(M3))),rep(0,(MT-(M1+M2+M3))))
 g <- scale(X) %*% b;
 print(c("total genetic variance :",var(g),"\n"))
 e <- rnorm(N,0, sqrt(0.5))
@@ -49,7 +50,7 @@ system("./plink --file simG  --make-bed --out simG")
 
 # run BayesR
 start.time <- Sys.time()
-system("../../ctggroup/bayesR/bin/bayesRv2 -bfile simG -burnin 15000 -thin 5 -numit 20000 -out simG")
+#system("../../ctggroup/bayesR/bin/bayesRv2 -bfile simG -burnin 15000 -thin 5 -numit 20000 -out simG")
 write.table((as.numeric(Sys.time() - start.time)*60), "time2.txt", row.names=F, col.names=F, quote=F)
 
 save.image("simulationGroups.RData")
@@ -66,6 +67,7 @@ load("simulationGroups.RData")
 # run our version
 Y <- y
 XX <- scale(X1)
+XX<-scale(X)
 P=0.5 #prior probability of a marker being excluded from the model
 sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED
 v0E= 0.0001 # degrees of freedom over the inv scaled chi square prior over residuals variance
@@ -74,7 +76,7 @@ v0G = 0.0001 #degrees of freedom of the inv bla bla prior over snp effects
 s02G = 0.001 # scale for the samecva 
 cva=as.matrix(c(0.0001,0.001,0.01)) #components variance
 
-BayesRSamplerV2("./simG.csv",2, 20000, 15000,5,XX, Y,sigma0,v0E,s02E,v0G,s02G,cva)
+BayesRSamplerV2("./simG.csv",2, 15000, 10000,1,XX, Y,sigma0,v0E,s02E,v0G,s02G,cva)
 
 
 
@@ -126,11 +128,11 @@ v0E= 0.0001 # degrees of freedom over the inv scaled chi square prior over resid
 s02E = 0.001 #scale of the inv scaled chi square prior over residuals variance
 v0G = 0.0001 #degrees of freedom of the inv bla bla prior over snp effects
 s02G = 0.001 # scale for the samecva 
-cva=as.matrix(c(0.0001,0.001,0.01)) #components variance
+cva=as.matrix(c(0.00001,0.0001,0.001,0.01)) #components variance
+#cva=c(1)
 
-
-G= 2.0 #number of groups
-GroupAssignment= c(rep(0,M1),rep(1,M2),sample(c(0,1),MT-(M1+M2),replace=T))
+G= 2 #number of groups
+GroupAssignment= c(rep(0,M1),rep(1,M2),rep(1,M3),sample(c(0,1),MT-(M1+M2+M3),replace=T))
 
 BayesRSamplerV2Groups("./simGroups.csv",2, 20000, 15000,5,XX, Y,sigma0,v0E,s02E,v0G,s02G,cva,G,GroupAssignment)
 
@@ -187,7 +189,7 @@ b=0.75 #prior parameter of beta distribution controling sparsity
 #Here we parametrised a and b such that the expected number of zeros =50% with a variance of 0.1
 spikeSlab("./simSpike.csv",1, 50000,30000 ,10,XX, Y,A,0.001,0.001,vL,sL,B,a,b)
 
-
+HorseshoePlusv2("./simSpike.csv",1, 15000,10000 ,5,scale(X), y,0.00001, 0.0001, 0.00001,1, 1, 1,0.01)
 ```
 
 ```{r spikeresults,results='hold'}
