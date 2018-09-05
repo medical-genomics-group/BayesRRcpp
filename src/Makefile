@@ -8,7 +8,7 @@
 # ---------------------------------------------------------------------
 
 # Set this variable to either LINUX, MAC or WIN
-OUTPUT = gctb
+OUTPUT = BRRM
 
 # Put C++ compiler here
 CXX_UNIX = mpicxx   #g++
@@ -39,7 +39,8 @@ HDR = gctb.hpp \
       options.hpp \
       mympi.hpp \
       BayesRRtoy.hpp \
-      BayesRMmapToy.hpp
+      BayesRMmapToy.hpp \
+      BayesRRm.h
 
 SRC = gctb.cpp \
       data.cpp \
@@ -49,7 +50,7 @@ SRC = gctb.cpp \
       mympi.cpp \
       BayesRRtoy.cpp \
       BayesRMmapToy.cpp
-
+ 	  BayesRRm.cpp
 
 OBJ = $(SRC:.cpp=.o)
 

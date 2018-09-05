@@ -9,8 +9,7 @@
 
 #include <iostream>
 #include "gctb.hpp"
-#include "BayesRRtoy.hpp"
-#include "BayesRMmapToy.hpp"
+#include "BayesRRm.h"
 #include <mpi.h>
 #include <string>
 
@@ -57,34 +56,8 @@ int main(int argc, const char * argv[]) {
     GCTB gctb(opt);
 
 
-    if (opt.analysisType == "Bayes" && opt.bayesType == "bayes") {
-      
-      clock_t start = clock();
+    if (opt.analysisType == "Bayes" ) {
 
-      readGenotypes = false;
-      gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax,
-			opt.mphen, opt.covariateFile);
-      gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
-			opt.includeChr, readGenotypes);
-
-      cout << "Start reading " << opt.bedFile+".bed" << endl;
-      clock_t start_bed = clock();
-      //data.readBedFile(opt.bedFile+".bed");
-      data.readBedFile_noMPI(opt.bedFile+".bed");
-      clock_t end   = clock();
-      printf("Finished reading the bed file in %.3f sec.\n", (float)(end - start_bed) / CLOCKS_PER_SEC);
-      cout << endl;
-
-      //gctb.inputSnpInfo already called data.readbedfiles
-      BayesRRtoy toy(data);
-      //EO 10 -> 1
-      toy.runToyExample(1);
-      end = clock();
-      printf("OVERALL read+compute time = %.3f sec.\n", (float)(end - start) / CLOCKS_PER_SEC);
-	    
-      //gctb.clearGenotypes(data);
-
-    } else if (opt.analysisType == "Bayes" && opt.bayesType == "bayesMmap") {
 
       clock_t start = clock();
 
@@ -94,8 +67,8 @@ int main(int argc, const char * argv[]) {
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
 			opt.includeChr, readGenotypes);
 
-      BayesRMmapToy mmapToy(data, opt.bedFile+".bed", sysconf(_SC_PAGE_SIZE));
-      mmapToy.runToyExample(1);
+      BayesRRm Bmmap(data, opt.bedFile+".bed", sysconf(_SC_PAGE_SIZE));
+      Bmmap.runGibbs();
 
       clock_t end   = clock();
       printf("OVERALL read+compute time = %.3f sec.\n", (float)(end - start) / CLOCKS_PER_SEC);
