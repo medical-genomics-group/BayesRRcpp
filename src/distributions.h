@@ -1,8 +1,7 @@
 #ifndef distributions_H
 #define distributions_H
 
-#include <Rcpp.h>
-#include <Eigen>
+#include <RcppEigen.h>
 #include <random>
 
 
