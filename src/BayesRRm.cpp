@@ -106,7 +106,7 @@ int BayesRRm::runGibbs(){
 
 			     components.setZero();
 			     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-			     y=(data.y).cast<double>();
+			     y=(data.y);
 			     epsilon= (y).array() - mu;
 			     sigmaE=epsilon.squaredNorm()/N*0.5;
 
@@ -129,7 +129,7 @@ int BayesRRm::runGibbs(){
 
 			         marker= markerI[j];
 			         data.getSnpDataFromBedFileUsingMmap(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
-			         X=normedSnpData.cast<double>();
+			         X=normedSnpData();
 
 			         y_tilde= epsilon.array()+(X*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
 
