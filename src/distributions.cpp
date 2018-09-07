@@ -1,5 +1,5 @@
 #include <Rcpp.h>
-#include <Eigen>
+#include <RcppEigen.h>
 #include <random>
 #include <math.h>
 #include <R.h>
