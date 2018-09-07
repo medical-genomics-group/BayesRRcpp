@@ -19,7 +19,7 @@ CXX_UNIX = mpicxx   #g++
 #CXXFLAGS = -w -O3 -m64 -DEIGEN_NO_DEBUG -msse2 -std=c++11 -I./
 # CXXFLAGS += -I../ -I../../ -I/home/dtrejoba/R/x86_64-koji-linux-gnu-library/3.4/Rcpp/include/ -I/usr/local/include -I/usr/local/include/Eigen -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ -DUNIX -m64 -ldl
 
-CXXFLAGS  = -I/software/R/3.4.2/include/R -I/home/dtrejoba/R/x86_64-koji-linux-gnu-library/3.4/Rcpp/include/  -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl -O3
+CXXFLAGS  =   -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl -O3
 CXXFLAGS += -fopenmp
 #CXXFLAGS += -mavx512f -mavx512cd -fopt-info-vec-all
 #CXXFLAGS += -g
@@ -40,6 +40,7 @@ HDR = gctb.hpp \
       mympi.hpp \
       BayesRRtoy.hpp \
       BayesRMmapToy.hpp \
+      distributions_boost.hpp \
       BayesRRm.h
 
 SRC = gctb.cpp \
@@ -49,6 +50,7 @@ SRC = gctb.cpp \
       options.cpp \
       mympi.cpp \
       BayesRRtoy.cpp \
+      distributions_boost.cpp \
       BayesRMmapToy.cpp \
  	  BayesRRm.cpp
 

@@ -10,7 +10,6 @@
 #include <Eigen/Core>
 #include <random>
 #include "distributions_boost.hpp"
-#include "MultVar.h"
 #include "concurrentqueue.h"
 BayesRRm::BayesRRm(Data &data, const string bedFile, const long memPageSize):data(data), bedFile(bedFile), memPageSize(memPageSize) {
 	cva(3);
