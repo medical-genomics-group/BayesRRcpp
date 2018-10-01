@@ -22,43 +22,6 @@ using Eigen::Map;
 using Eigen::Upper;
 typedef Map<MatrixXd> MapMatd;
 
-
-template<typename Scalar>
-struct scalar_normal_dist_op
-{
-  static std::mt19937 rng;                        // The uniform pseudo-random algorithm
-  mutable std::normal_distribution<Scalar> norm; // gaussian combinator
-
-  EIGEN_EMPTY_STRUCT_CTOR(scalar_normal_dist_op)
-
-    template<typename Index>
-    inline const Scalar operator() (Index, Index = 0) const { return norm(rng); }
-    inline void seed(const uint64_t &s) { rng.seed(s); }
-};
-
-template<typename Scalar>
-std::mt19937 scalar_normal_dist_op<Scalar>::rng;
-
-
-template<typename Scalar>
-struct categorical_functor
-{
-  categorical_functor(const Eigen::VectorXd& pi,const Scalar& sigmaG) : m_b(sigmaG),m_c(pi){}
-
-  const Scalar operator()(const Scalar& x) const{ return component_probs(x,m_c,m_b); }
-  Scalar  m_b;
-  Eigen::VectorXd m_c;
-};
-//Functor perform a componentwise draw from a categorical distribution with parameters pi
-template<typename Scalar>
-struct categorical_init
-{
-  categorical_init(const Eigen::VectorXd& pi) : m_c(pi){}
-
-  const Scalar operator()(const Scalar& x) const{ return categorical(m_c); }
-  Eigen::VectorXd m_c;
-};
-
 /*
 * Bayes R sampler
 * outputFile- The file in which the samples aftare burnin will be stored
