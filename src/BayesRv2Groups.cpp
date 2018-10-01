@@ -5,7 +5,6 @@
 #include <Eigen/Core>
 #include <random>
 #include "distributions.h"
-#include "MultVar.h"
 #include "concurrentqueue.h"
 
 // [[Rcpp::depends(RcppEigen)]]
