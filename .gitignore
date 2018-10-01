@@ -1,2 +1,13 @@
 packrat/lib*/
 .Rproj.user
+*.o
+*.RData
+*.csv
+.Rprofile
+.Rhistory
+.DS_Store
+*.lyx
+equations*
+*.pdf
+simulation*
+*.tar.gz
