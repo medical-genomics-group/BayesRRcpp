@@ -1,5 +1,7 @@
 // [[Rcpp::plugins(openmp)]]
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <Rcpp.h>
 #include <RcppEigen.h>
 #include <Eigen/Core>
@@ -11,7 +13,28 @@
 using namespace Rcpp;
 using namespace RcppEigen;
 using namespace Eigen;
+inline void initialize_file( std::ofstream& outFile,int M,int N){
+  bool queueFull;
+  queueFull=0;
 
+
+  outFile<< "iteration,"<<"mu,";
+  for(unsigned int i = 0; i < M; ++i){
+    outFile << "beta[" << (i+1) << "],";
+
+  }
+  outFile<<"sigmaE,"<<"sigmaG,";
+  for(unsigned int i = 0; i < M; ++i){
+    outFile << "comp[" << (i+1) << "],";
+  }
+  unsigned int i;
+  for(i = 0; i < (N-1);i++){
+    outFile << "epsilon[" << (i+1) << "],";
+  }
+
+  outFile << "epsilon[" << (i+1) << "]";
+  outFile<<"\n";
+}
 
 //' BayesR sampler
 //'
@@ -41,7 +64,12 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
   int N(Y.size());
   int M(X.cols());
   VectorXd components(M);
+  std::ofstream outFile;
 
+  outFile.open(outputFile);
+  initialize_file(outFile,M,N);
+  VectorXd sampleq(2*M+4+N);
+  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
   int K(cva.size()+1);
   ////////////validate inputs
 
@@ -68,16 +96,17 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
   /////end of declarations//////
 
 
-  Eigen::initParallel();
-  Eigen::setNbThreads(10);
-  double sum_beta_sqr;
+//  Eigen::initParallel();
+ // Eigen::setNbThreads(10);
 
-
+#ifdef _OPENMP
+ omp_set_num_threads(2);
+#endif
 #pragma omp parallel num_threads(2) shared(flag,q,M,N)
 {
 #pragma omp sections
 {
-
+  //begin producer
   {
 
     //mean and residual variables
@@ -230,6 +259,14 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
         if(iteration % thinning == 0){
           sample<< iteration,mu,beta,sigmaE,sigmaG,components,epsilon;
           q.enqueue(sample);
+#ifdef _OPENMP
+
+#else
+          if(q.try_dequeue(sampleq))
+            outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
+#endif
+           //here we have the consumer
+
         }
 
       }
@@ -240,35 +277,17 @@ void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int b
     auto duration = std::chrono::duration_cast<std::chrono::seconds>( t2 - t1 ).count();
     Rcpp::Rcout << "duration: "<<duration << "s\n";
     flag=1;
-  }
+  }//end producer
+#ifdef _OPENMP
 #pragma omp section
-{
-  bool queueFull;
-  queueFull=0;
-  std::ofstream outFile;
-  outFile.open(outputFile);
-  VectorXd sampleq(2*M+4+N);
-  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
-  outFile<< "iteration,"<<"mu,";
-  for(unsigned int i = 0; i < M; ++i){
-    outFile << "beta[" << (i+1) << "],";
+      {
 
-  }
-  outFile<<"sigmaE,"<<"sigmaG,";
-  for(unsigned int i = 0; i < M; ++i){
-    outFile << "comp[" << (i+1) << "],";
-  }
-  for(unsigned int i = 0; i < N; ++i){
-    outFile << "epsilon[" << (i+1) << "],";
-  }
-  outFile<<"\n";
-
-  while(!flag ){
-    if(q.try_dequeue(sampleq))
-      outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
-  }
-}
-
+        while(!flag ){
+          if(q.try_dequeue(sampleq))
+            outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
+        }
+      }//end consumer
+#endif
 }
 }
 

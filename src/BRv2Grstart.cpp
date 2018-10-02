@@ -1,5 +1,7 @@
 // [[Rcpp::plugins(openmp)]]
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <Rcpp.h>
 #include <RcppEigen.h>
 #include <Eigen/Core>
@@ -20,6 +22,33 @@ using Eigen::Lower;
 using Eigen::Map;
 using Eigen::Upper;
 typedef Map<MatrixXd> MapMatd;
+
+inline void initialize_file( std::ofstream& outFile,int M,int N,int groups){
+  bool queueFull;
+  queueFull=0;
+
+
+  outFile<< "iteration,"<<"mu,";
+  for(unsigned int i = 0; i < M; ++i){
+    outFile << "beta[" << (i+1) << "],";
+
+  }
+  outFile<<"sigmaE,";
+  for(unsigned int i = 0; i < M; ++i){
+    outFile << "comp[" << (i+1) << "],";
+  }
+  for(unsigned int i = 0; i < groups; ++i){
+    outFile << "sigmaG[" << (i+1) << "],";
+  }
+  unsigned int i;
+  for(i = 0; i < (N-1);i++){
+    outFile << "epsilon[" << (i+1) << "],";
+  }
+
+  outFile << "epsilon[" << (i+1) << "]";
+  outFile<<"\n";
+}
+
 
 
 
@@ -51,7 +80,11 @@ void BRV2Grstart(std::string outputFile, int seed, int max_iterations, int burn_
   flag=0;
   int N(epsilon.size());
   int M(X.cols());
+  std::ofstream outFile;
 
+  outFile.open(outputFile);
+  VectorXd sampleq(2*M+3+groups+N);
+  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
 
   int K(cva.cols()+1);
   ////////////validate inputs
@@ -78,63 +111,60 @@ void BRV2Grstart(std::string outputFile, int seed, int max_iterations, int burn_
   }
   /////end of declarations//////
 
-
-  Eigen::initParallel();
-  Eigen::setNbThreads(10);
-  double sum_beta_sqr;
-
-
+#ifdef _OPENMP
+  omp_set_num_threads(2);
+#endif
 #pragma omp parallel num_threads(2) shared(flag,q,M,N)
 {
-#pragma omp sections
-{
+      #pragma omp sections
+      {
+      //begin producer
+      {
 
-  {
 
+      //component variables
+      MatrixXd pi(groups,K); // mixture probabilities
+      VectorXd logL(K); // log likelihood of component
+      VectorXd muk(K); // mean of k-th component marker effect size
+      VectorXd denom(K-1); // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
+      int m0; // total num ber of markes in model
+      MatrixXd v(groups,K); //variable storing the component assignment
+      VectorXd cVa(K); //component-specific variance
 
-    //component variables
-    MatrixXd pi(groups,K); // mixture probabilities
-    VectorXd logL(K); // log likelihood of component
-    VectorXd muk(K); // mean of k-th component marker effect size
-    VectorXd denom(K-1); // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
-    int m0; // total num ber of markes in model
-    MatrixXd v(groups,K); //variable storing the component assignment
-    VectorXd cVa(K); //component-specific variance
+      VectorXd cVaI(K);// inverse of the component variances
 
-    VectorXd cVaI(K);// inverse of the component variances
+      //linear model variables
+      VectorXd y_tilde(N); // variable containing the adjusted residuals to exclude the effects of a given marker
 
-    //linear model variables
-    VectorXd y_tilde(N); // variable containing the adjusted residuals to exclude the effects of a given marker
-
-    //sampler variables
-    VectorXd sample(2*M+3+groups+N); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
-    std::vector<int> markerI;
-    for (int i=0; i<M; ++i) {
+      //sampler variables
+      VectorXd sample(2*M+3+groups+N); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
+      std::vector<int> markerI;
+      for (int i=0; i<M; ++i) {
       markerI.push_back(i);
-    }
-    VectorXd xsquared(M);
-    double num;
-    double sigmaG;
+      }
+      VectorXd xsquared(M);
+      double num;
+      double sigmaG;
 
-    int marker;
-    double acum;
-    VectorXd betaAcum(groups);
+      int marker;
+      double acum;
+      VectorXd betaAcum(groups);
 
 
 
-    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-    xsquared=X.colwise().squaredNorm();
-    v.setZero();
-    //here we use the current components to get a draw of pi
-    for(int i=0;i<M;i++)
-    {
+      std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+      xsquared=X.colwise().squaredNorm();
+      v.setZero();
+      //here we use the current components to get a draw of pi
+      for(int i=0;i<M;i++)
+      {
       v(gAssign(i),components(i))+=1.0;
-    }
-    for(int i=0; i<groups; i++){
+      }
+      for(int i=0; i<groups; i++){
       pi.row(i)=dirichilet_rng(v.row(i).array() + 1.0);
-    }
+      }
 
-    for(int iteration=0; iteration < max_iterations; iteration++){
+      for(int iteration=0; iteration < max_iterations; iteration++){
 
       if(iteration>0)
         if( iteration % (int)std::ceil(max_iterations/10) ==0)
@@ -236,49 +266,40 @@ void BRV2Grstart(std::string outputFile, int seed, int max_iterations, int burn_
           if(iteration % thinning == 0){
             sample<< iteration,mu,beta,sigmaE,components,sigmaGG,epsilon;
             q.enqueue(sample);
+            //here we have the consumer
+#ifdef _OPENMP
+
+#else
+            if(q.try_dequeue(sampleq))
+              outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
+#endif
+
           }
+
 
         }
 
-    }
+      }
 
-    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>( t2 - t1 ).count();
-    Rcpp::Rcout << "duration: "<<duration << "s\n";
-    flag=1;
-  }
+      std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+      auto duration = std::chrono::duration_cast<std::chrono::seconds>( t2 - t1 ).count();
+      Rcpp::Rcout << "duration: "<<duration << "s\n";
+      flag=1;
+      }//endproducer
+#ifdef _OPENMP
+        //begin consumer
 #pragma omp section
-{
-  bool queueFull;
-  queueFull=0;
-  std::ofstream outFile;
-  outFile.open(outputFile);
-  VectorXd sampleq(2*M+3+groups+N);
-  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
-  outFile<< "iteration,"<<"mu,";
-  for(unsigned int i = 0; i < M; ++i){
-    outFile << "beta[" << (i+1) << "],";
+        {
+          while(!flag ){
+            if(q.try_dequeue(sampleq))
+              outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
+          }//while
+        }// end consumer
+#endif
 
-  }
-  outFile<<"sigmaE,";
-  for(unsigned int i = 0; i < M; ++i){
-    outFile << "comp[" << (i+1) << "],";
-  }
-  for(unsigned int i = 0; i < groups; ++i){
-    outFile << "sigmaG[" << (i+1) << "],";
-  }
-  for(unsigned int i = 0; i < N; ++i){
-    outFile << "epsilon[" << (i+1) << "],";
-  }
-  outFile<<"\n";
+      }//end sections
 
-  while(!flag ){
-    if(q.try_dequeue(sampleq))
-      outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
-  }
-}
 
-}
 }
 
 }

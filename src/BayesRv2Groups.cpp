@@ -1,12 +1,13 @@
 // [[Rcpp::plugins(openmp)]]
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <Rcpp.h>
 #include <RcppEigen.h>
 #include <Eigen/Core>
 #include <random>
 #include "distributions.h"
 #include "concurrentqueue.h"
-
 // [[Rcpp::depends(RcppEigen)]]
 using namespace Rcpp;
 using namespace RcppEigen;
@@ -20,6 +21,32 @@ using Eigen::Lower;
 using Eigen::Map;
 using Eigen::Upper;
 typedef Map<MatrixXd> MapMatd;
+
+inline void initialize_file( std::ofstream& outFile,int M,int N,int groups){
+  bool queueFull;
+  queueFull=0;
+
+
+  outFile<< "iteration,"<<"mu,";
+  for(unsigned int i = 0; i < M; ++i){
+    outFile << "beta[" << (i+1) << "],";
+
+  }
+  outFile<<"sigmaE,";
+  for(unsigned int i = 0; i < M; ++i){
+    outFile << "comp[" << (i+1) << "],";
+  }
+  for(unsigned int i = 0; i < groups; ++i){
+    outFile << "sigmaG[" << (i+1) << "],";
+  }
+  unsigned int i;
+  for(i = 0; i < (N-1);i++){
+    outFile << "epsilon[" << (i+1) << "],";
+  }
+
+  outFile << "epsilon[" << (i+1) << "]";
+  outFile<<"\n";
+}
 
 
 //' BayesRR sampler
@@ -46,8 +73,12 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
   int N(Y.size());
   int M(X.cols());
   VectorXd components(M);
+  std::ofstream outFile;
 
+  outFile.open(outputFile);
   int K(cva.cols()+1);
+  VectorXd sampleq(2*M+3+groups+N);
+  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
   ////////////validate inputs
 
   if(max_iterations < burn_in || max_iterations<1 || burn_in<1) //validations related to mcmc burnin and iterations
@@ -72,17 +103,18 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
   }
   /////end of declarations//////
 
-
-  Eigen::initParallel();
-  Eigen::setNbThreads(10);
-  double sum_beta_sqr;
-
-
+  initialize_file(outFile,M,N,groups);
+ // Eigen::initParallel();
+//  Eigen::setNbThreads(10);
+  //double sum_beta_sqr;
+#ifdef _OPENMP
+  omp_set_num_threads(2);
+#endif
 #pragma omp parallel num_threads(2) shared(flag,q,M,N)
 {
 #pragma omp sections
 {
-
+  //producer
   {
 
     //mean and residual variables
@@ -259,6 +291,13 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
           if(iteration % thinning == 0){
             sample<< iteration,mu,beta,sigmaE,components,sigmaGG,epsilon;
             q.enqueue(sample);
+            //here we have the consumer
+#ifdef _OPENMP
+
+#else
+            if(q.try_dequeue(sampleq))
+              outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
+#endif
           }
 
         }
@@ -269,39 +308,24 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
     auto duration = std::chrono::duration_cast<std::chrono::seconds>( t2 - t1 ).count();
     Rcpp::Rcout << "duration: "<<duration << "s\n";
     flag=1;
-  }
-#pragma omp section
-{
-  bool queueFull;
-  queueFull=0;
-  std::ofstream outFile;
-  outFile.open(outputFile);
-  VectorXd sampleq(2*M+3+groups+N);
-  IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
-  outFile<< "iteration,"<<"mu,";
-  for(unsigned int i = 0; i < M; ++i){
-    outFile << "beta[" << (i+1) << "],";
+  }//end producer
+  //consumer
+    #ifdef _OPENMP
+    #pragma omp section
+    {
 
-  }
-  outFile<<"sigmaE,";
-  for(unsigned int i = 0; i < M; ++i){
-    outFile << "comp[" << (i+1) << "],";
-  }
-  for(unsigned int i = 0; i < groups; ++i){
-    outFile << "sigmaG[" << (i+1) << "],";
-  }
-  for(unsigned int i = 0; i < N; ++i){
-    outFile << "epsilon[" << (i+1) << "],";
-  }
-  outFile<<"\n";
 
-  while(!flag ){
-    if(q.try_dequeue(sampleq))
-      outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
-  }
+      while(!flag ){
+        if(q.try_dequeue(sampleq))
+          outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
+      }//while
+
+
+
+    }// endconsumer
+    #endif
 }
 
-}
 }
 
 }
