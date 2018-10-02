@@ -23,21 +23,27 @@ typedef Map<MatrixXd> MapMatd;
 
 
 
-/*
-* Bayes R sampler
-* outputFile- The file in which the samples aftare burnin will be stored
-* seed- random seed
-* max_iterations- total of number of samples taken.
-* burn_in - integer leq than max_iterations, number of samples used for burn in, after which, al samples will  be stored in the outputFile
-* thinning- thinning regime, not implemented
-* X- matrix of snp markers, or covariates of interest
-* Y- vector of response variates, must have the same number of rows as X
-* sigma0- variance of the zero-centered normal prior over the intercept
-* v0E- degrees of  freedom of the prior inverse scaled chi-squared distribution over residues variance
-* s02E - scale parameter of the prior inverse scaled chi-squared distribution over residues variance
-* v0G- degrees of freedom of the prior inverse scaled chi-squared distribution over genetic effects variance
-* s02G- scale parameter of the prior inverse scaled chi-squared distribution over genetic effects variance
-*/
+//' BayesRR sampler function to re-start a preexisting BayesRR Markov chain.
+//' @param outputFile The file in which the samples aftare burnin will be stored
+//' @param seed random seed
+//' @param max_iterations total of number of samples taken.
+//' @param burn_in integer leq than max_iterations, number of samples used for burn in, after which, al samples will  be stored in the outputFile
+//' @param thinning thinning regime, not implemented
+//' @param mu last sample of mu from the previous chain.
+//' @param beta vector of last sample of the effects (beta) from the last chain.
+//' @param sigmaE value of residuals variance sigmaE in the last sample of the last chain.
+//' @param sigmaGG vector of values for the group variances in the last sample in the last chain.
+//' @param X matrix of snp markers, or covariates of interest
+//' @param epsilon vecor of residuals from the last sample in the last chain.
+//' @param components vector of mixture assignments for each effect in the last sample for the last chain.
+//' @param sigma0 variance of the zero-centered normal prior over the intercept
+//' @param v0E degrees of  freedom of the prior inverse scaled chi-squared distribution over residues variance
+//' @param s02E scale parameter of the prior inverse scaled chi-squared distribution over residues variance
+//' @param v0G degrees of freedom of the prior inverse scaled chi-squared distribution over genetic effects variance
+//' @param s02G scale parameter of the prior inverse scaled chi-squared distribution over genetic effects variance
+//' @param cva Matrix of mixture variances for groups, rows must be the same as number of groups, columns the same as number of mixtures.
+//' @param groups number of groups
+//' @param gAssign Vector of the same size as the number of columns of X, containing group assignments for each column(starting with group 0).
 // [[Rcpp::export]]
 void BRV2Grstart(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning,double mu, Eigen::MatrixXd beta, double sigmaE, Eigen::VectorXd sigmaGG, Eigen::MatrixXd X, Eigen::VectorXd epsilon,Eigen::VectorXd components, double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::MatrixXd cva,int groups, Eigen::VectorXi gAssign) {
   int flag;
@@ -52,22 +58,22 @@ void BRV2Grstart(std::string outputFile, int seed, int max_iterations, int burn_
 
   if(max_iterations < burn_in || max_iterations<1 || burn_in<1) //validations related to mcmc burnin and iterations
   {
-    std::cout<<"error: burn_in has to be a positive integer and smaller than the maximum number of iterations ";
+    Rcpp::Rcerr<<"error: burn_in has to be a positive integer and smaller than the maximum number of iterations ";
     return;
   }
   if(sigma0 < 0 || v0E < 0 || s02E < 0 || v0G < 0||  s02G < 0 )//validations related to hyperparameters
   {
-    std::cout<<"error: hyper parameters have to be positive";
+    Rcpp::Rcerr<<"error: hyper parameters have to be positive";
     //return;
   }
   if((cva.array()==0).any() )//validations related to hyperparameters
   {
-    std::cout<<"error: the zero component is already included in the model by default";
+    Rcpp::Rcerr<<"error: the zero component is already included in the model by default";
     //return;
   }
   if((cva.array()<0).any() )//validations related to hyperparameters
   {
-    std::cout<<"error: the variance of the components should be positive";
+    Rcpp::Rcerr<<"error: the variance of the components should be positive";
     //return;
   }
   /////end of declarations//////
@@ -132,7 +138,7 @@ void BRV2Grstart(std::string outputFile, int seed, int max_iterations, int burn_
 
       if(iteration>0)
         if( iteration % (int)std::ceil(max_iterations/10) ==0)
-          std::cout << "iteration: "<<iteration <<"\n";
+          Rcpp::Rcout << "iteration: "<<iteration <<"\n";
 
         epsilon= epsilon.array()+mu;//  we substract previous value
         mu = norm_rng(epsilon.sum()/(double)N, sigmaE/(double)N); //update mu
@@ -162,7 +168,7 @@ void BRV2Grstart(std::string outputFile, int seed, int max_iterations, int burn_
 
           muk[0]=0.0;//muk for the zeroth component=0
 
-          // std::cout<< muk;
+          // Rcpp::Rcout<< muk;
           //we compute the denominator in the variance expression to save computations
           denom=xsquared(marker)+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
           //muk for the other components is computed according to equaitons
@@ -238,7 +244,7 @@ void BRV2Grstart(std::string outputFile, int seed, int max_iterations, int burn_
 
     std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::seconds>( t2 - t1 ).count();
-    std::cout << "duration: "<<duration << "s\n";
+    Rcpp::Rcout << "duration: "<<duration << "s\n";
     flag=1;
   }
 #pragma omp section

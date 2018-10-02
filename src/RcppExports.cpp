@@ -81,114 +81,11 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
-// dirichilet_rng
-Eigen::VectorXd dirichilet_rng(Eigen::VectorXd alpha);
-RcppExport SEXP _BayesRRcpp_dirichilet_rng(SEXP alphaSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Eigen::VectorXd >::type alpha(alphaSEXP);
-    rcpp_result_gen = Rcpp::wrap(dirichilet_rng(alpha));
-    return rcpp_result_gen;
-END_RCPP
-}
-// inv_gamma_rng
-double inv_gamma_rng(double shape, double scale);
-RcppExport SEXP _BayesRRcpp_inv_gamma_rng(SEXP shapeSEXP, SEXP scaleSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type shape(shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type scale(scaleSEXP);
-    rcpp_result_gen = Rcpp::wrap(inv_gamma_rng(shape, scale));
-    return rcpp_result_gen;
-END_RCPP
-}
-// gamma_rng
-double gamma_rng(double shape, double scale);
-RcppExport SEXP _BayesRRcpp_gamma_rng(SEXP shapeSEXP, SEXP scaleSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type shape(shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type scale(scaleSEXP);
-    rcpp_result_gen = Rcpp::wrap(gamma_rng(shape, scale));
-    return rcpp_result_gen;
-END_RCPP
-}
-// inv_gamma_rate_rng
-double inv_gamma_rate_rng(double shape, double rate);
-RcppExport SEXP _BayesRRcpp_inv_gamma_rate_rng(SEXP shapeSEXP, SEXP rateSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type shape(shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type rate(rateSEXP);
-    rcpp_result_gen = Rcpp::wrap(inv_gamma_rate_rng(shape, rate));
-    return rcpp_result_gen;
-END_RCPP
-}
-// gamma_rate_rng
-double gamma_rate_rng(double shape, double rate);
-RcppExport SEXP _BayesRRcpp_gamma_rate_rng(SEXP shapeSEXP, SEXP rateSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type shape(shapeSEXP);
-    Rcpp::traits::input_parameter< double >::type rate(rateSEXP);
-    rcpp_result_gen = Rcpp::wrap(gamma_rate_rng(shape, rate));
-    return rcpp_result_gen;
-END_RCPP
-}
-// inv_scaled_chisq_rng
-double inv_scaled_chisq_rng(double dof, double scale);
-RcppExport SEXP _BayesRRcpp_inv_scaled_chisq_rng(SEXP dofSEXP, SEXP scaleSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type dof(dofSEXP);
-    Rcpp::traits::input_parameter< double >::type scale(scaleSEXP);
-    rcpp_result_gen = Rcpp::wrap(inv_scaled_chisq_rng(dof, scale));
-    return rcpp_result_gen;
-END_RCPP
-}
-// norm_rng
-double norm_rng(double mean, double sigma2);
-RcppExport SEXP _BayesRRcpp_norm_rng(SEXP meanSEXP, SEXP sigma2SEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type mean(meanSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma2(sigma2SEXP);
-    rcpp_result_gen = Rcpp::wrap(norm_rng(mean, sigma2));
-    return rcpp_result_gen;
-END_RCPP
-}
-// component_probs
-double component_probs(double b2, Eigen::VectorXd pi);
-RcppExport SEXP _BayesRRcpp_component_probs(SEXP b2SEXP, SEXP piSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< double >::type b2(b2SEXP);
-    Rcpp::traits::input_parameter< Eigen::VectorXd >::type pi(piSEXP);
-    rcpp_result_gen = Rcpp::wrap(component_probs(b2, pi));
-    return rcpp_result_gen;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_BayesRRcpp_BayesRSamplerV2", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2, 13},
     {"_BayesRRcpp_BayesRSamplerV2Groups", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2Groups, 15},
     {"_BayesRRcpp_BRV2Grstart", (DL_FUNC) &_BayesRRcpp_BRV2Grstart, 20},
-    {"_BayesRRcpp_dirichilet_rng", (DL_FUNC) &_BayesRRcpp_dirichilet_rng, 1},
-    {"_BayesRRcpp_inv_gamma_rng", (DL_FUNC) &_BayesRRcpp_inv_gamma_rng, 2},
-    {"_BayesRRcpp_gamma_rng", (DL_FUNC) &_BayesRRcpp_gamma_rng, 2},
-    {"_BayesRRcpp_inv_gamma_rate_rng", (DL_FUNC) &_BayesRRcpp_inv_gamma_rate_rng, 2},
-    {"_BayesRRcpp_gamma_rate_rng", (DL_FUNC) &_BayesRRcpp_gamma_rate_rng, 2},
-    {"_BayesRRcpp_inv_scaled_chisq_rng", (DL_FUNC) &_BayesRRcpp_inv_scaled_chisq_rng, 2},
-    {"_BayesRRcpp_norm_rng", (DL_FUNC) &_BayesRRcpp_norm_rng, 2},
-    {"_BayesRRcpp_component_probs", (DL_FUNC) &_BayesRRcpp_component_probs, 2},
     {NULL, NULL, 0}
 };
 
