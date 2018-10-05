@@ -11,3 +11,6 @@ equations*
 *.pdf
 simulation*
 *.tar.gz
+inst/doc
+*.rdb
+*.rdx

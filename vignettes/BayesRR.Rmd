@@ -1,0 +1,226 @@
+---
+title: "BayesR and BayesRR"
+author: "Daniel Trejo Baños"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+bibliography: bibliography.bib
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+#  BayesR implementation
+
+The current package prototype is an implementation of BayesR [@erbe2012improving]. It was developed in C++ 11.0 with interface to R through Rcpp. For numeric and matrix computations the library Eigen3 was used, along with it's R interface:
+
+- the random effects coefficients are sampled from four distributions in a mixture. the mixture variances are 0, 0.01, 0.001 and 0.0001 times the parameter $\sigma_{G}$. These variances can be adjusted through a vector cva.
+
+- The MCMC parameters can be adjusted, including maximum number of iterations, burn-in period and thinning of chains, a parameter seed is present but has not effect as we rely on the R environment seed instead.
+
+- The output is stored in text files, with fields delimited by comas, as such we recommend to add the extension .csv at the end of the filename. Only samples after burn_in and who correspond to a non-thined sample (iteration number modulo thinning equals 0) are saved. If openmp is available, the function will create two threads, a sampler thread and writer thread, if not, saving in file is done during sampling.
+
+## Small simulation
+
+Here we are going to generate a matrix of 4000 individuals with 2000 genotype markers, from which 1000 have a non-zero effect over a phenotype $y$.
+
+```{r,cache=T}
+
+MT = 2000
+N = 5000
+M = 1000
+X <- matrix(rbinom(n=MT*N, 2, .5), ncol=MT)
+X1<-X
+X[X == 2] <- "GG"
+X[X == 1] <- "AG"
+X[X == 0] <- "AA"
+b <- c(rnorm(M,0,sqrt(0.4/M)),rep(0,(MT-M))) # M non-zero effects
+g <- scale(X1) %*% b;  
+e <- rnorm(N,0, sqrt(0.6)) #residuals variance
+y = g + e  #we simulate phenotype
+ped <- data.frame(fid = 1:N, iid = 1:N, pid = rep(0,N), mid = rep(0,N), sex = rep(1,N), y = y, X)
+write.table(ped, paste("sim1.ped",sep=''), row.names=F, col.names=F, quote=F)
+map <- data.frame(chr = rep(1, MT), rs = paste("rs",1:MT,sep=''),  cm = rep(0,MT), bp = 1:MT)
+write.table(map, paste("sim1.map",sep=''), row.names=F, col.names=F, quote=F)
+
+```
+
+We are going to use plink to convert our simulated data into a bed file to exemplify a pipeline (assuming there is a plink installed in the system)
+```{r,cache=T}
+# use plink to convert to binary
+system("./plink --file ./sim1  --make-bed --out ./sim1")
+
+```
+
+We will simulate a phenotype again because plink may switch the allele ordering wen creating the BED file.
+
+```{r,cache=T}
+
+library(BEDMatrix)
+X1 <- BEDMatrix("sim1.bed") #We read the genotype matrix from the bed file, to ensure the allele ordering is the same
+X1 <- scale(X1) #we center and scale the genotype matrix
+b <- c(rnorm(M,0,sqrt(0.4/M)),rep(0,(MT-M))) # M non-zero effects
+g <- X1 %*% b;  
+e <- rnorm(N,0, sqrt(0.6)) #residuals variance
+y = g + e  #we simulate phenotype
+```
+
+Now lets simulate a matrix of measurements coming from a methylation array data, lets assume that they have been QC'ed so that there is an exact correspondance with individuals in the genotype matrix. For 
+```{r,cache=T}
+
+M2T= 5000
+M2 = 2000
+X2 <- matrix(rnorm(n=M2T*N),ncol=M2T)
+b2 <- c(rnorm(M2,0,sqrt(0.5/M2)),rep(0,(M2T-M2)))
+m <- scale(X2) %*% b2; 
+e2 <- rnorm(N,0, sqrt(0.1))
+y2 <- g + m + e2
+```
+
+
+# BayesR
+
+
+We assume additive genetic effects $\beta_{G}\in\mathbb{R}^{\mathrm{M_{G}}\times1}$, associated over a vector of measurements
+over a trait $\mathbf{y}\in\mathbb{R}^{\mathrm{N}\times1}$ such that,
+
+\begin{equation}
+\mathbf{y}=\mathbf{X}_{G}\beta_{G}+\epsilon\label{eq:linear}
+\end{equation}
+
+where $\epsilon\sim\mathcal{N}\left(0,\sigma_{\epsilon}^{2}\mathbf{I}_{N}\right)$, the genotype matrix $\mathbf{X}_{G}$ have been centered and scaled to unit variance.
+
+
+## Example pipeline
+We load the Bed file using the 
+
+Having the phenotype $y$ and the marker matrix $X1$ we aim to recover the true effects $b$
+
+```{r,cache=T} 
+library(BEDMatrix) #for reading the BED file into a matrix
+X <- BEDMatrix("sim1.bed") 
+library(BayesRRcpp)
+Y<-scale(y) #we center and scale to std=1 to interpret results in scale of sd
+XX <- scale(X) #we center and scale the columns of X
+sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED YET
+v0E= 0.0001 # degrees of freedom over the inv scaled chi square prior over residuals variance
+s02E = 0.001 #scale of the inv scaled chi square prior over residuals variance
+v0G = 0.0001 #degrees of freedom of the inv bla bla prior over snp effects
+s02G = 0.001 # scale for the samecva 
+cva=as.matrix(c(0.0001,0.001,0.01)) #components variance
+markers.ID<-colnames(XX) #we strongly recommend to save the marker ID before running BayesR
+BayesRSamplerV2("./sim1.csv",2, 20000, 15000,5,XX, Y,sigma0,v0E,s02E,v0G,s02G,cva)
+```
+
+The output file *sim1.csv* is a text file with comma separated fields, the first line contains the variables names, which are:
+
+- **iteration** Number of sample from the chain.
+- **mu** Intercept of the model.
+- **beta[0],beta[1],...,beta[M]** One beta for each effect in the marker matrix X and in the same order
+- **sigmaE** Residuals variance parameter $\sigma_{\epsilon}^2$.
+- **sigmaG** Markers variance parameter $\sigma_{G}^2$.
+- **comp[0],comp[1],...,comp[M]** Mixture assignment for each marker.
+- **epsilon[0],epsilon[1],...,epsilon[N]** Vector of residuals(same dimension as number of individuals).
+
+We are going to plot the correlation between true effects and the mean of the posterior effects inferred from the data.
+
+```{r,cache=T}
+library(data.table) # to read the csv file
+C<-fread("./sim1.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$sigmaG #genetic markers variance
+print(summary(varG))
+
+```
+We can normalize the variance to the total amount of variance in the model to get the proportion of variance explained by the genetic markers, which in our simulations amounts to approximately the same as the variance of the simulated marker effects
+```{r,cache=T}
+print(summary(varG/(varE+varG)))
+```
+
+We can also plot get summaries and statistics over the inferred effects, for example lets plot the posterior mean of the inferrer effects against the true values
+
+```{r,cache=T}
+true_effects<-b
+inferred_effects<-colMeans(as.matrix(C)[,grep("beta",colnames(C))]) #we look for all the effects in the posterior chain and get the mean over samples
+names(inferred_effects)<-markers.ID #we associate the previously saved markers ID to recover the names of the markers.
+
+plot(true_effects,inferred_effects)
+
+```
+
+
+# BayesRR: BayesR for different groups of variables
+
+
+We assume additive probe effects $\beta_{cpg}\in\mathbb{R}^{\mathrm{M_{cpg}}\times1}$
+, genetic effects $\beta_{G}\in\mathbb{R}^{\mathrm{M_{G}}\times1}$,
+age and sex effects $\alpha,\gamma$ associated over a vector of measurements
+over a trait $\mathbf{y}\in\mathbb{R}^{\mathrm{N}\times1}$ such that,
+
+\begin{equation}
+\mathbf{y}=\alpha\mathrm{age}+\gamma\mathrm{sex}+\mathbf{X}_{cpg}\beta_{cpg}+\mathbf{X}_{G}\beta_{G}+\epsilon\label{eq:linear2}
+\end{equation}
+
+where $\epsilon\sim\mathcal{N}\left(0,\sigma_{\epsilon}^{2}\mathbf{I}_{N}\right)$,
+the methylation matrix $\mathbf{X}_{M}$ and the genotype matrix $\mathbf{X}_{G}$
+have been centered and scaled to unit variance.
+
+
+
+```{r,eval=F,cache=T}
+# run our version
+Y <- scale(y2)
+X <- cbind(scale(XX),scale(X2))
+P=0.5 #prior probability of a marker being excluded from the model
+sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED
+v0E= 0.0001 # degrees of freedom over the inv scaled chi square prior over residuals variance
+s02E = 0.001 #scale of the inv scaled chi square prior over residuals variance
+v0G = 0.0001 #degrees of freedom of the inv bla bla prior over snp effects
+s02G = 0.001 # scale for the samecva 
+cva=matrix(c(c(0.00001,0.0001,0.001,0.01),c(0.00001,0.0001,0.001,0.01)),nrow=2,byrow = T) #components variance prior scales
+
+G= 2 #number of groups
+GroupAssignment= c(rep(0,MT),rep(1,M2T)) #group 0 is for genetic markers in this case and group 1 is for methylation markers, age and sex
+
+BayesRSamplerV2Groups("./simGroups.csv",2, 20000, 15000,5,X, Y,sigma0,v0E,s02E,v0G,s02G,cva,G,GroupAssignment)
+```
+
+
+
+```{r}
+library(data.table) # to read the csv file
+C<-fread("./simGroups.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$`sigmaG[2]`
+#methylation markers variance
+print(summary(varG))
+
+varG2<-C$`sigmaG[1]`
+#genetic markers variance
+print(summary(varG2))
+
+```
+
+We can compute the proportion of variance explained by genetic and methylation markers
+```{r}
+#PVE by methylation markers
+print(summary(varG/(varG+varG2+varE)))
+
+#PVE by genetic markers
+print(summary(varG2/(varG+varG2+varE)))
+```
+
+
+
+# References
