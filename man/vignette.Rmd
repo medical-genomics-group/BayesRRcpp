@@ -7,7 +7,7 @@ output: html_document
 
 ## Current Bayes R implementation
 
-The current package prototype is an implementation of Bayes R (citation ). It was developed in C++ 11.0 with interface to R through Rcpp. For numeric and matrix computations the library Eigen was used, along with it's R interface. The implementation has the following caveats:
+The current package prototype is an implementation of BayesR (citation ). It was developed in C++ 11.0 with interface to R through Rcpp. For numeric and matrix computations the library Eigen was used, along with it's R interface. The implementation has the following caveats:
 
 - the random effects coefficients are sampled from four distributions in a mixture. the mixture variances are 0, 0.01, 0.001 and 0.0001 times the parameter $\sigma_{G}$. for now, the mixture components are hardcoded as 0, 0.01, 0.001 and 0.0001, but that can be changed as an additional parameter in the near future.
 - the random effects are sampled all at once, by performing the cholesky decomposition of the matrix $X'X+D$ where D is the diagonal matrix containing the mixture variances. Said decomposition has a $\mathcal{O}\left( M^3\right)$ complexity (where M is the number of effects). There are many ways to reduce said complexity, like conditioning in subsets of effects or augmented variable sampling(none which has been implemented yet).
