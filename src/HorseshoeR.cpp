@@ -106,7 +106,7 @@ struct inv_gamma_functor_init_v
 * s02G- scale parameter of the prior inverse scaled chi-squared distribution over genetic effects variance
 */
 // [[Rcpp::export]]
-void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double A, double v0E, double s02E, double vL, double vT, int B,double c2) {
+void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double A, double v0E, double s02E, double vL, double vT,double c2,double vC,double sC) {
   int flag;
   moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
   flag=0;
@@ -172,13 +172,6 @@ void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_i
 
     mu=0;
 
-    eta=inv_gamma_rate_rng(0.5,1/pow(A,2));
-    eta=0.00001;
-    std::cout<< "initial eta " << eta<<"\n";
-    tau=(1.0/eta)*inv_gamma_rate_rng(0.5*vT,vT);
-
-    // tau=1/A;
-    std::cout<< "initial tau " << tau<<"\n";
 
     v=(v.setOnes().array()).unaryExpr(inv_gamma_functor<double>(0));
     v.setOnes();
@@ -192,6 +185,16 @@ void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_i
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     epsilon= Y.array() - mu - (X*beta).array();
     sigmaE=epsilon.squaredNorm()/N*0.5;
+
+    eta=inv_gamma_rate_rng(0.5,1/(sigmaE*pow(A,2)));
+    //eta=0.00001;
+    std::cout<< "initial eta " << eta<<"\n";
+    tau=(1.0/eta)*inv_gamma_rate_rng(0.5*vT,vT);
+
+    // tau=1/A;
+    std::cout<< "initial tau " << tau<<"\n";
+
+
     for(int iteration=0; iteration < max_iterations; iteration++){
 
       if(iteration>0)
@@ -211,7 +214,7 @@ void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_i
 
         std::random_shuffle(markerI.begin(), markerI.end());
 
-        eta = inv_gamma_rate_rng(0.5+0.5*vT,(1.0/(A*A))+vT/tau);
+        eta = inv_gamma_rate_rng(0.5+0.5*vT,(1.0/(sigmaE*A*A))+vT/tau);
         v=(vL/(lambda).array()+1.0).unaryExpr(inv_gamma_functor<double>(vL));
         for(int j=0; j < M; j++){
 
@@ -242,7 +245,7 @@ void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_i
         tau= inv_gamma_rate_rng(0.5*(M+vT),vT/eta+((0.5)*((beta.array().pow(2))/lambda.array()).sum()));
 
         //tau=A;
-        // c2=inv_gamma_rate_rng(0.5*vC+0.5*M,vC*sC*0.5+0.5*beta.squaredNorm());
+         c2=inv_gamma_rate_rng(0.5*vC+0.5*M,vC*sC*0.5+0.5*beta.squaredNorm());
         //  c2=sC;
 
 
@@ -252,7 +255,7 @@ void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_i
         if(iteration >= burn_in)
         {
           if(iteration % thinning == 0){
-            sample<< iteration,mu,beta,sigmaE,sigmaG,lambda,epsilon;
+            sample<< iteration,mu,beta,sigmaE,tau,lambda,epsilon;
             q.enqueue(sample);
           }
 
@@ -278,9 +281,9 @@ void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_i
     outFile << "beta[" << (i+1) << "],";
 
   }
-  outFile<<"sigmaE,"<<"sigmaG,";
+  outFile<<"sigmaE,"<<"tau,";
   for(unsigned int i = 0; i < M; ++i){
-    outFile << "comp[" << (i+1) << "],";
+    outFile << "lambda[" << (i+1) << "],";
   }
   for(unsigned int i = 0; i < N; ++i){
     outFile << "epsilon[" << (i+1) << "],";
@@ -311,35 +314,33 @@ X <- matrix(rnorm(M*N), N, M); var(X[,1])
     X=scale(X)
     vT=1
     vL=1
-    A=200
-    A=(0.5/sqrt(N))*A/(M-A)
-    c2=0.1
-    v0E=1
-    s02E=1
+    A=1500
+    A=(1/sqrt(N))*A/(M-A)
+    c2=1.0
+    v0E=0.001
+    s02E=0.001
+    vC=10
+    sC=10.0
 
-    HorseshoeR("./test2.csv",1, 5000,3000 ,10,X, Y, A,  v0E, s02E,  vL,  vT,  1, c2)
+    HorseshoeR("./test2.csv",1, 20000,10000 ,10,X, Y, A,  v0E, s02E,  vL,  vT, c2,vC,sC)
       library(readr)
      library(data.table)
       tmp <- fread("./test2.csv")
       tmp<-as.matrix(tmp)
       plot(B,colMeans(tmp[,grep("beta",colnames(tmp))]))
+      summary(lm(B~colMeans(tmp[,grep("beta",colnames(tmp))])))
       lines(B,B)
       abline(h=0)
       G <- X%*%B;
     var(G)
-      mean(tmp$EV)
-      1-var(G)
+      tmp<-as.data.frame(tmp)
+
       mean(tmp$sigmaE)
       plot(tmp$sigmaE)
       plot(tmp$mu)
       plot(tmp$tau)
       hist(as.matrix(tmp[,grep("beta",names(tmp))]))
-      colMeans(tmp[,grep("lambda",names(tmp))])
 
-      plot(B,colMeans(tmp[,grep("beta",names(tmp))]))
-      lines(B,B)
-      plot(tmp$sigmaE)
-      plot(tmp$`beta[1]`)
 
 
 
