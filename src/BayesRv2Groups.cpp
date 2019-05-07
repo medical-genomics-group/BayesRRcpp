@@ -154,7 +154,7 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
 
 
 
-        for(int i=0; i < numberGroups; i++){
+        for(int i=0; i < groups; i++){
         	priorPi.row(i)(0)=0.5;
         	for(int k=1;k<K;k++){
         	priorPi.row(i)(k)=0.5/K;
