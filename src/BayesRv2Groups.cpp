@@ -237,8 +237,7 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
           logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(xsquared(marker))*cVa.segment(1,(K-1)).array() + 1).array().log()))+
             0.5*( muk.segment(1,(K-1)).array()*num)/sigmaE;
 
-          double p(beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
-
+          double p((double)R::runif( 0.0, 1.0 )));//
 
           if(((logL.segment(1,(K-1)).array()-logL[0]).abs().array() >700 ).any() ){
             acum=0;
