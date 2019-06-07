@@ -1,0 +1,164 @@
+---
+title: "Miscellaneous observations about BayesR"
+output:
+  html_notebook: default
+  pdf_document: default
+---
+
+
+First we generate the testing data set
+```{r}
+
+M=200 #non zero marker effects
+N=2000 #observations
+MT=5000 #number of markers
+B=matrix(rnorm(MT,sd=sqrt(0.5/M)),ncol=1) #marker effects, M marquers explain approx 50% of the variance
+B[sample(1:MT,MT-M),1]=0 #we set MT-M marker effects to zero
+#B=-abs(B)
+X <- matrix(rnorm(MT*N), N, MT); var(X[,1])
+G <- scale(X)%*%B;
+var(G)
+Y=G
+
+Covariates <- matrix(rnorm(N*2,sd = 1),ncol=2)
+C <- c(1/(2*sqrt(5)),-1/(2*sqrt(5)))
+Y = Y+ scale(Covariates) %*% C
+var(scale(Covariates) %*% C)
+e = rnorm(N,sd=sqrt(0.4))
+Y = Y + e
+var(rnorm(N,sd=sqrt(0.4)))
+
+#Y=scale(Y)
+X=scale(X)
+iter=20000
+burnin =10000
+thin=10
+```
+
+
+##Alternative parametrizations
+
+Here we source the BayesR that uses $\sigma_G$ and the alternative parametrization using $\sigma_\beta$, the difference comes when sampling from the scaled inverse chi squared distribution.
+
+- For  $\sigma_G$ we have a scaled inverse chi squared distribution with $v+m_0$ degrees of freedom and scale of $\frac{m_0 \sum{\beta^2} + vS^2}{v+m_0}$
+- For $\sigma_\beta$ we have a scaled inverse chi squared distribution with $v+ m_0$ degrees of fredoom and scale of $\frac{m_0 \sum{\beta^2} + vS^2}{v + m_0}$ 
+
+Now we source BayesR
+```{r,warning=F,message=F,error=F,}
+Rcpp::sourceCpp('../src/BayesRv2.cpp')
+```
+
+And create a small function to plot relevant output
+
+```{r}
+library(readr) 
+plot_output<-function(sampleFile){
+  tmp <- as.matrix(data.table::fread(sampleFile))
+  #names(tmp)
+  #plot(tmp$sigmaG); mean(tmp$sigmaG)
+
+  plot(B,colMeans(tmp[,grep("beta",colnames(tmp))]), xlab = "true beta",ylab = "mean beta inferred",main = "true vs mean inferred betas" )
+  lines(B,B)
+  abline(h=0)
+  par(mfrow=c(3,2),pch='.')
+  
+  comps<-tmp[,grep("comp",colnames(tmp))]
+  invComps<-apply(comps,MARGIN=1,FUN = function(x){sum(ifelse(x==0,0,1/x))})
+  tmp<- data.table::fread(sampleFile)
+  
+  plot(tmp$mu, xlab="iteration" , ylab ="mu trace plot")
+  plot(tmp$sigmaE/(tmp$sigmaE+tmp$sigmaF+tmp$sigmaG), xlab="iteration",ylab ="sigmaE / total_variance")
+  abline(h=var(e)/(var(e)+var(G)+var(C)))
+  plot(tmp$sigmaG/(tmp$sigmaE+tmp$sigmaF+tmp$sigmaG),xlab = "iteration", ylab = "sigmaG / total_variance")
+  abline(h=var(G)/(var(e)+var(G)+var(C)))
+  plot(tmp$sigmaF/(tmp$sigmaE+tmp$sigmaF+tmp$sigmaG), xlab = "iteration", ylab = "sigmaF / total_variance")
+  abline(h=var(C)/(var(e)+var(G)+var(C)))
+  plot(as.matrix(tmp)[,"gamma[1]"], xlab ="iteration" , ylab= "gamma[1]")
+  abline(h=C[1])
+  plot(as.matrix(tmp)[,"gamma[2]"],xlab = "itration", ylab = "gamma[2]")
+  abline(h=C[2])
+  
+  par(mfrow=c(3,2),pch='.')
+
+  plot(tmp$m0,xlab="iteration",main="traceplot of markers in model")
+  abline(h=200)
+  hist(tmp$m0,breaks=100,main = "histogram of markers in model")
+  abline(v=200)
+  plot(invComps, xlab= "iteration", main= "sum of inverse of components variances")
+  hist(invComps,main="histogram of sum of inverse of components variances")
+  plot(tmp$m0,invComps,xlab = "markers in model", ylab="sum of inverse comp. variances")
+}
+```
+
+And run the normal BayesR
+
+```{r,message=F,warning=F}
+P=0.5 #prior probability of a marker being excluded from the model
+sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED
+v0E=0.01 # degrees of freedom over the inv scaled chi square prior over residuals variance
+s02E=0.01 #scale of the inv scaled chi square prior over residuals variance
+v0G=0.01 #degrees of freedom of the inv bla bla prior over snp effects
+s02G=0.01 # scale for the same
+BayesRSamplerV2("./test.csv",2, iter, burnin,thin,X, scale(Y),sigma0,v0E,s02E,v0G,s02G,c(0.1,0.01),scale(Covariates))
+plot_output('./test.csv')
+tmp<-as.matrix(data.table::fread("test.csv"))
+
+```
+
+ 
+We now see what happens if we add another component
+
+```{r,message=F,warning=F,fig.cap= "BayesR output with components 0.1,0.01,0.001"}
+P=0.5 #prior probability of a marker being excluded from the model
+sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED
+v0E=0.01 # degrees of freedom over the inv scaled chi square prior over residuals variance
+s02E=0.01 #scale of the inv scaled chi square prior over residuals variance
+v0G=0.01 #degrees of freedom of the inv bla bla prior over snp effects
+s02G=0.01 # scale for the same
+BayesRSamplerV2("./test2.csv",2, iter, burnin,thin,X, scale(Y),sigma0,v0E,s02E,v0G,s02G,c(0.1,0.01,0.001),scale(Covariates))
+plot_output("test2.csv")
+```
+
+#alternative parametrization
+
+now we run BayesR with the alternative parametrization
+
+```{r,fig.cap= "BayesR with sigmaBeta parametrization and mixture components 0.1" }
+BayesRSamplerV2sigmaB("./test3.csv",2, iter, burnin,thin,X, scale(Y),sigma0,v0E,s02E,v0G,s02G,c(0.1),scale(Covariates))
+plot_output("./test3.csv")
+
+```
+Given that in the $\sigma_beta$ parametrization we have $\sigma_\beta = var(\mathbf{X}\beta)$ we need to compute it like this
+
+```{r, fig.cap=" Variance explained for the sigmaBeta parametrization"}
+tmp<- data.table::fread("test3.csv")
+betas <- as.matrix(tmp)[,grep("beta",colnames(tmp))]
+inferred_g <- scale(X) %*% t(betas)
+par(pch=".")
+plot(apply(inferred_g,MARGIN = 2,"var"),ylabel= "sigmaG", main="traceplot sigmaG")
+abline(h=var(G)/(var(e)+var(G)+var(C)))
+
+```
+
+If we add extra components we get less sparse solutions
+
+```{r,fig.caption= "BayesR with sigmaBeta parametrization and variance components 0.1,0.01 and 0.001"}
+BayesRSamplerV2sigmaB("./test4.csv",2, iter, burnin,thin,X, scale(Y),sigma0,v0E,s02E,v0G,s02G,c(0.1,0.01,0.001),scale(Covariates))
+plot_output("./test4.csv")
+tmp<- data.table::fread("test4.csv")
+betas <- as.matrix(tmp)[,grep("beta",colnames(tmp))]
+inferred_g <- scale(X) %*% t(betas)
+plot(apply(inferred_g,MARGIN = 2,"var"),ylabel= "sigmaG", main="traceplot sigmaG")
+abline(h=var(G)/(var(e)+var(G)+var(C)))
+
+```
+
+This small example only contained data generated from a single mixture.
+Conjectures:
+Bayes R prior meaning relates more to the number of markers allowed in the model
+SigmaBeta prior meaning relates to the mean scale of the effects.
+
+
+
+
+

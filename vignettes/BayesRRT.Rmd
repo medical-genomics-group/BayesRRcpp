@@ -1,0 +1,385 @@
+---
+title: "BayesRRvignette"
+author: "Daniel Trejo Banos"
+date: "17/12/2018"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+#  BayesR implementation
+
+The current package prototype is an implementation of BayesR [@erbe2012improving]. It was developed in C++ 11.0 with interface to R through Rcpp. For numeric and matrix computations the library Eigen3 was used, along with it's R interface:
+
+- the random effects coefficients are sampled from four distributions in a mixture. the mixture variances are 0, 0.01, 0.001 and 0.0001 times the parameter $\sigma_{G}$. These variances can be adjusted through a vector cva.
+
+- The MCMC parameters can be adjusted, including maximum number of iterations, burn-in period and thinning of chains, a parameter seed is present but has not effect as we rely on the R environment seed instead.
+
+- The output is stored in text files, with fields delimited by comas, as such we recommend to add the extension .csv at the end of the filename. Only samples after burn_in and who correspond to a non-thined sample (iteration number modulo thinning equals 0) are saved. If openmp is available, the function will create two threads, a sampler thread and writer thread, if not, saving in file is done during sampling.
+
+## Small simulation
+
+Here we are going to generate a matrix of 4000 individuals with 2000 genotype markers, from which 1000 have a non-zero effect over a phenotype $y$.
+
+```{r,cache=T}
+library(MASS)
+Rcpp::sourceCpp('../src/TemperedBayesR.cpp')
+MT = 2000
+N = 500
+M = 100
+X <- matrix(rbinom(n=MT*N, 2, .5), ncol=MT)
+A<-matrix(runif(MT^2)*2-1, ncol=MT) 
+Sigma<-crossprod(A)
+X<-mvrnorm(n=N,mu=rep(0,MT), Sigma = Sigma)
+b <- c(rnorm(M,0,sqrt(0.4/M)),rep(0,(MT-M))) # M non-zero effects
+g <- scale(X) %*% b;  
+e <- rnorm(N,0, sqrt(0.6)) #residuals variance
+y = g + e  #we simulate phenotype
+```
+
+
+# BayesR tempered distribution
+
+
+```{r,cache=T} 
+library(BayesRRcpp)
+Y<-scale(y) #we center and scale to std=1 to interpret results in scale of sd
+XX <- scale(X) #we center and scale the columns of X
+sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED YET
+v0E= 0.01 # degrees of freedom over the inv scaled chi square prior over residuals variance
+s02E = 0.01 #scale of the inv scaled chi square prior over residuals variance
+v0G = 7 #degrees of freedom of the inv bla bla prior over snp effects
+s02G = 0.4 # scale for the samecva 
+cva=as.matrix(0.01,0.001) #components variance
+markers.ID<-colnames(XX) #we strongly recommend to save the marker ID before running BayesR
+BayesRSamplerV2T("./sim1.csv",
+                2, 
+                50000, 
+                45000,
+                5,
+                XX, 
+                Y,
+                sigma0,
+                v0E,
+                s02E,
+                v0G,
+                s02G,
+                cva,1)
+```
+
+The output file *sim1.csv* is a text file with comma separated fields, the first line contains the variables names, which are:
+
+- **iteration** Number of sample from the chain.
+- **mu** Intercept of the model.
+- **beta[0],beta[1],...,beta[M]** One beta for each effect in the marker matrix X and in the same order
+- **sigmaE** Residuals variance parameter $\sigma_{\epsilon}^2$.
+- **sigmaG** Markers variance parameter $\sigma_{G}^2$.
+- **comp[0],comp[1],...,comp[M]** Mixture assignment for each marker.
+- **epsilon[0],epsilon[1],...,epsilon[N]** Vector of residuals(same dimension as number of individuals).
+
+We are going to plot the correlation between true effects and the mean of the posterior effects inferred from the data.
+
+```{r,cache=T}
+library(data.table) # to read the csv file
+C<-fread("./sim1.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$sigmaG #genetic markers variance
+print(summary(varG))
+
+```
+We can normalize the variance to the total amount of variance in the model to get the proportion of variance explained by the genetic markers, which in our simulations amounts to approximately the same as the variance of the simulated marker effects
+```{r,cache=T}
+mu<- mean(as.matrix(C)[,"mu"])
+print(mu)
+print(summary(varG/(varE+varG)))
+```
+
+We can also plot get summaries and statistics over the inferred effects, for example lets plot the posterior mean of the inferrer effects against the true values
+
+```{r,cache=T}
+true_effects<-b
+inferred_effects<-colMeans(as.matrix(C)[,grep("beta",colnames(C))]) #we look for all the effects in the posterior chain and get the mean over samples
+names(inferred_effects)<-markers.ID #we associate the previously saved markers ID to recover the names of the markers.
+
+plot(true_effects,inferred_effects)
+hist(as.matrix(C)[,grep("beta",colnames(C))][,MT],breaks=100)
+abline(v=true_effects[MT])
+print(1-sum(as.matrix(C)[,grep("comp",colnames(C))][,MT]>0)/nrow(as.matrix(C)))
+hist(as.matrix(C)[,grep("beta",colnames(C))][,1],breaks=100)
+abline(v=true_effects[1])
+hist(rowSums(ifelse(as.matrix(C)[,grep("comp",colnames(C))]>0,1,0)),breaks=100)
+h1=as.matrix(C)[,"h"]
+plot(density(as.matrix(C)[,"h"]))
+plot(varG)
+plot(varE)
+```
+
+```{r,cache=T}
+BayesRSamplerV2T("./sim2.csv",
+                2, 
+                20000, 
+                15000,
+                5,
+                XX, 
+                Y,
+                sigma0,
+                v0E,
+                s02E,
+                v0G,
+                s02G,
+                cva,0.83)
+
+C<-fread("./sim2.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$sigmaG #genetic markers variance
+print(summary(varG))
+
+print(summary(varG/(varE+varG)))
+mu<- mean(as.matrix(C)[,"mu"])
+print(mu)
+true_effects<-b
+inferred_effects<-colMeans(as.matrix(C)[,grep("beta",colnames(C))]) #we look for all the effects in the posterior chain and get the mean over samples
+names(inferred_effects)<-markers.ID #we associate the previously saved markers ID to recover the names of the markers.
+
+plot(true_effects,inferred_effects)
+hist(as.matrix(C)[,grep("beta",colnames(C))][,MT])
+print(1-sum(as.matrix(C)[,grep("comp",colnames(C))][,MT]>0)/nrow(as.matrix(C)))
+hist(as.matrix(C)[,grep("beta",colnames(C))][,1])
+hist(rowSums(ifelse(as.matrix(C)[,grep("comp",colnames(C))]>0,1,0)),breaks=100)
+h2=as.matrix(C)[,"h"]
+plot(density(as.matrix(C)[,"h"]))
+```
+
+
+
+
+```{r,cache=T}
+BayesRSamplerV2T("./sim3.csv",
+                2, 
+                20000, 
+                15000,
+                5,
+                XX, 
+                Y,
+                sigma0,
+                v0E,
+                s02E,
+                v0G,
+                s02G,
+                cva,0.7)
+
+C<-fread("./sim3.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$sigmaG #genetic markers variance
+print(summary(varG))
+
+print(summary(varG/(varE+varG)))
+mu<- mean(as.matrix(C)[,"mu"])
+print(mu)
+true_effects<-b
+inferred_effects<-colMeans(as.matrix(C)[,grep("beta",colnames(C))]) #we look for all the effects in the posterior chain and get the mean over samples
+names(inferred_effects)<-markers.ID #we associate the previously saved markers ID to recover the names of the markers.
+
+plot(true_effects,inferred_effects)
+hist(as.matrix(C)[,grep("beta",colnames(C))][,MT])
+print(1-sum(as.matrix(C)[,grep("comp",colnames(C))][,MT]>0)/nrow(as.matrix(C)))
+hist(as.matrix(C)[,grep("beta",colnames(C))][,1])
+hist(rowSums(ifelse(as.matrix(C)[,grep("comp",colnames(C))]>0,1,0)),breaks=100)
+h3=as.matrix(C)[,"h"]
+plot(density(as.matrix(C)[,"h"]))
+```
+
+
+
+```{r,cache=T}
+BayesRSamplerV2T("./sim4.csv",
+                2, 
+                20000, 
+                15000,
+                5,
+                XX, 
+                Y,
+                sigma0,
+                v0E,
+                s02E,
+                v0G,
+                s02G,
+                cva,0.5)
+
+C<-fread("./sim4.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$sigmaG #genetic markers variance
+print(summary(varG))
+
+print(summary(varG/(varE+varG)))
+mu<- mean(as.matrix(C)[,"mu"])
+print(mu)
+true_effects<-b
+inferred_effects<-colMeans(as.matrix(C)[,grep("beta",colnames(C))]) #we look for all the effects in the posterior chain and get the mean over samples
+names(inferred_effects)<-markers.ID #we associate the previously saved markers ID to recover the names of the markers.
+
+plot(true_effects,inferred_effects)
+hist(as.matrix(C)[,grep("beta",colnames(C))][,MT])
+print(1-sum(as.matrix(C)[,grep("comp",colnames(C))][,MT]>0)/nrow(as.matrix(C)))
+hist(as.matrix(C)[,grep("beta",colnames(C))][,1])
+hist(rowSums(ifelse(as.matrix(C)[,grep("comp",colnames(C))]>0,1,0)),breaks=100)
+h4=as.matrix(C)[,"h"]
+plot(density(as.matrix(C)[,"h"]))
+```
+
+
+
+```{r,cache=T}
+BayesRSamplerV2T("./sim5.csv",
+                2, 
+                20000, 
+                15000,
+                5,
+                XX, 
+                Y,
+                sigma0,
+                v0E,
+                s02E,
+                v0G,
+                s02G,
+                cva,0.3)
+
+C<-fread("./sim5.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$sigmaG #genetic markers variance
+print(summary(varG))
+
+print(summary(varG/(varE+varG)))
+mu<- mean(as.matrix(C)[,"mu"])
+print(mu)
+true_effects<-b
+inferred_effects<-colMeans(as.matrix(C)[,grep("beta",colnames(C))]) #we look for all the effects in the posterior chain and get the mean over samples
+names(inferred_effects)<-markers.ID #we associate the previously saved markers ID to recover the names of the markers.
+
+plot(true_effects,inferred_effects)
+hist(as.matrix(C)[,grep("beta",colnames(C))][,MT])
+print(1-sum(as.matrix(C)[,grep("comp",colnames(C))][,MT]>0)/nrow(as.matrix(C)))
+hist(as.matrix(C)[,grep("beta",colnames(C))][,1])
+hist(rowSums(ifelse(as.matrix(C)[,grep("comp",colnames(C))]>0,1,0)),breaks=100)
+h5=as.matrix(C)[,"h"]
+plot(density(as.matrix(C)[,"h"]))   
+```
+
+```{r,cache=T}
+BayesRSamplerV2T("./sim6.csv",
+                2, 
+                20000, 
+                15000,
+                5,
+                XX, 
+                Y,
+                sigma0,
+                v0E,
+                s02E,
+                v0G,
+                s02G,
+                cva,0.1)
+
+C<-fread("./sim6.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$sigmaG #genetic markers variance
+print(summary(varG))
+
+print(summary(varG/(varE+varG)))
+mu<- mean(as.matrix(C)[,"mu"])
+print(mu)
+true_effects<-b
+inferred_effects<-colMeans(as.matrix(C)[,grep("beta",colnames(C))]) #we look for all the effects in the posterior chain and get the mean over samples
+names(inferred_effects)<-markers.ID #we associate the previously saved markers ID to recover the names of the markers.
+
+plot(true_effects,inferred_effects)
+hist(as.matrix(C)[,grep("beta",colnames(C))][,MT])
+print(1-sum(as.matrix(C)[,grep("comp",colnames(C))][,MT]>0)/nrow(as.matrix(C)))
+hist(as.matrix(C)[,grep("beta",colnames(C))][,1])
+hist(rowSums(ifelse(as.matrix(C)[,grep("comp",colnames(C))]>0,1,0)),breaks=100)
+h6=as.matrix(C)[,"h"]
+plot(density(as.matrix(C)[,"h"]))   
+```
+
+```{r,cache=T}
+BayesRSamplerV2T("./sim7.csv",
+                2, 
+                20000, 
+                15000,
+                5,
+                XX, 
+                Y,
+                sigma0,
+                v0E,
+                s02E,
+                v0G,
+                s02G,
+                cva,0.01)
+
+C<-fread("./sim7.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$sigmaG #genetic markers variance
+print(summary(varG))
+
+print(summary(varG/(varE+varG)))
+mu<- mean(as.matrix(C)[,"mu"])
+print(mu)
+true_effects<-b
+inferred_effects<-colMeans(as.matrix(C)[,grep("beta",colnames(C))]) #we look for all the effects in the posterior chain and get the mean over samples
+names(inferred_effects)<-markers.ID #we associate the previously saved markers ID to recover the names of the markers.
+
+plot(true_effects,inferred_effects)
+hist(as.matrix(C)[,grep("beta",colnames(C))][,MT])
+print(1-sum(as.matrix(C)[,grep("comp",colnames(C))][,MT]>0)/nrow(as.matrix(C)))
+hist(as.matrix(C)[,grep("beta",colnames(C))][,1])
+hist(rowSums(ifelse(as.matrix(C)[,grep("comp",colnames(C))]>0,1,0)),breaks=100)
+h7=as.matrix(C)[,"h"]
+plot(density(as.matrix(C)[,"h"]))   
+```
+
+
+
+
+```{r}
+library(ggplot2)
+
+#Sample data
+dat <- data.frame(dens = c(h1,h2,h3,h4,h5,h6,h7)
+                   , lines = rep(c("alpha=1","alpha=0.83","alpha=0.7","alpha=0.5","alpha=0.3","alpha=0.1","alpha=0.01"), each = 1000))
+#Plot.
+ggplot(dat, aes(x = dens, fill = lines)) + geom_density(alpha = 0.5)
+
+dat <- data.frame(energy = c(h1,h2,h3,h4,h5,h6)
+                   , lines = rep(c("alpha=1","alpha=0.83","alpha=0.7","alpha=0.5","alpha=0.3","alpha=0.1"), each = 1000))
+ggplot(dat, aes(x = energy, fill = lines)) + geom_density(alpha = 0.5)
+
+qplot(x=c(1,0.83,0.7,0.5,0.3,0.1,0.01),y=-1*c(mean(h1),mean(h2),mean(h3),mean(h4),mean(h5),mean(h6),mean(h7)),geom="line",ylab = "-Energy")
+qplot(x=c(1,0.83,0.7,0.5,0.3,0.1),y=-1*c(mean(h1),mean(h2),mean(h3),mean(h4),mean(h5),mean(h6)),geom="line",ylab="-Energy")
+qplot(x=c(1,0.83,0.7,0.5,0.3,0.1),y=c(sd(h1),sd(h2),sd(h3),sd(h4),sd(h5),sd(h6)),geom="line",ylab="energy sd")
+```
+
+
+
+

@@ -8,7 +8,7 @@ using namespace Rcpp;
 using namespace RcppEigen;
 using Eigen::VectorXd;
 
-
+// [[Rcpp::export]]
 Eigen::VectorXd dirichilet_rng(Eigen::VectorXd alpha) {
   int len;
   len=alpha.size();
@@ -30,7 +30,7 @@ double inv_gamma_rate_rng(double shape,double rate){
 double gamma_rate_rng(double shape,double rate){
   return R::rgamma(shape,1.0/rate);
 }
-
+// [[Rcpp::export]]
 double inv_scaled_chisq_rng(double dof,double scale){
   return inv_gamma_rng(0.5*dof, 0.5*dof*scale);
 }

@@ -302,11 +302,12 @@ void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_i
 }
 
 /*** R
-M=3000
-N=2000
-MT=200
+library(BayesRRcpp)
+M=6000
+N=3000
+MT=20
 B=matrix(rnorm(M,sd=sqrt(0.5/MT)),ncol=1)
-  B[sample(1:M,M-MT),1]=0
+  B[sample(1:M,M-MT),1]=rnorm(M-MT,sd=1e-8)
 X <- matrix(rnorm(M*N), N, M); var(X[,1])
   G <- X%*%B; var(G)
     Y=X%*%B+rnorm(N,sd=sqrt((1-var(G)))); var(Y)
@@ -341,8 +342,28 @@ X <- matrix(rnorm(M*N), N, M); var(X[,1])
       plot(tmp$tau)
       hist(as.matrix(tmp[,grep("beta",names(tmp))]))
 
+      sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED YET
+      v0E= 0.0001 # degrees of freedom over the inv scaled chi square prior over residuals variance
+    s02E = 0.001 #scale of the inv scaled chi square prior over residuals variance
+    v0G = 0.0001 #degrees of freedom of the inv bla bla prior over snp effects
+    s02G = 0.001 # scale for the samecva
+    cva=as.matrix(c(0.0001,0.001,0.01)) #components variance
+      BayesRSamplerV2("./test1.csv",2, 20000, 15000,5,X, Y,sigma0,v0E,s02E,v0G,s02G,cva)
+      library(readr)
+      library(data.table)
+      tmp <- fread("./test1.csv")
+      tmp<-as.matrix(tmp)
+      plot(B,colMeans(tmp[,grep("beta",colnames(tmp))]))
+      summary(lm(B~colMeans(tmp[,grep("beta",colnames(tmp))])))
+      lines(B,B)
+      abline(h=0)
+      G <- X%*%B;
+    var(G)
+      tmp<-as.data.frame(tmp)
 
-
+      mean(tmp$sigmaE)
+      plot(tmp$sigmaE)
+      plot(tmp$mu)
 
       */
 

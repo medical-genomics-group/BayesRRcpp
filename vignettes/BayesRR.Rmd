@@ -110,8 +110,8 @@ library(BayesRRcpp)
 Y<-scale(y) #we center and scale to std=1 to interpret results in scale of sd
 XX <- scale(X) #we center and scale the columns of X
 sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED YET
-v0E= 0.0001 # degrees of freedom over the inv scaled chi square prior over residuals variance
-s02E = 0.001 #scale of the inv scaled chi square prior over residuals variance
+v0E= 7 # degrees of freedom over the inv scaled chi square prior over residuals variance
+s02E = 0.6 #scale of the inv scaled chi square prior over residuals variance
 v0G = 0.0001 #degrees of freedom of the inv bla bla prior over snp effects
 s02G = 0.001 # scale for the samecva 
 cva=as.matrix(c(0.0001,0.001,0.01)) #components variance
