@@ -22,7 +22,7 @@ using Eigen::Map;
 using Eigen::Upper;
 typedef Map<MatrixXd> MapMatd;
 
-inline void initialize_file( std::ofstream& outFile,int M,int N,int groups){
+inline void initialize_file( std::ofstream& outFile,int M,int N,int groups, int F){
   bool queueFull;
   queueFull=0;
 
@@ -44,7 +44,12 @@ inline void initialize_file( std::ofstream& outFile,int M,int N,int groups){
     outFile << "epsilon[" << (i+1) << "],";
   }
 
-  outFile << "epsilon[" << (i+1) << "]";
+  outFile << "epsilon[" << (i+1) << "],";
+
+  for(i = 0; i < F; i ++){
+    outFile << "alpha[" << (i+1) << "],";
+  }
+  outFile << "sigmaF";
   outFile<<"\n";
 }
 
@@ -66,18 +71,19 @@ inline void initialize_file( std::ofstream& outFile,int M,int N,int groups){
 //' @param groups number of groups
 //' @param gAssign Vector of the same size as the number of columns of X, containing group assignments for each column(starting with group 0).
 // [[Rcpp::export]]
-void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::MatrixXd cva,int groups, Eigen::VectorXi gAssign) {
+void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::MatrixXd cva,int groups, Eigen::VectorXi gAssign, Eigen::MatrixXd fixed) {
   int flag;
   moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
   flag=0;
   int N(Y.size());
   int M(X.cols());
+  int F(fixed.cols());
   VectorXd components(M);
   std::ofstream outFile;
 
   outFile.open(outputFile);
   int K(cva.cols()+1);
-  VectorXd sampleq(2*M+3+groups+N);
+  VectorXd sampleq(2*M+3+groups+ N + F+ 1);
   IOFormat CommaInitFmt(StreamPrecision, DontAlignCols, ", ", ", ", "", "", "", "");
   ////////////validate inputs
 
@@ -103,14 +109,14 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
   }
   /////end of declarations//////
 
-  initialize_file(outFile,M,N,groups);
+  initialize_file(outFile,M,N,groups,F);
  // Eigen::initParallel();
 //  Eigen::setNbThreads(10);
   //double sum_beta_sqr;
 #ifdef _OPENMP
   omp_set_num_threads(2);
 #endif
-#pragma omp parallel num_threads(2) shared(flag,q,M,N)
+#pragma omp parallel num_threads(2) shared(flag,q,M,N,F)
 {
 #pragma omp sections
 {
@@ -122,6 +128,7 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
     double sigmaG; //genetic variance
     double sigmaE; // residuals variance
     VectorXd sigmaGG(groups);
+    double sigmaF; // fixed effects variance
 
     //component variables
     MatrixXd priorPi(groups,K); // prior probabilities for each component
@@ -136,14 +143,19 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
 
     //linear model variables
     MatrixXd beta(M,1); // effect sizes
+    VectorXd alpha(F); // fixed effects
     VectorXd y_tilde(N); // variable containing the adjusted residuals to exclude the effects of a given marker
     VectorXd epsilon(N); // variable containing the residuals
 
     //sampler variables
-    VectorXd sample(2*M+3+groups+N); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
+    VectorXd sample(2*M+3+groups+ N + F+ 1); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
     std::vector<int> markerI;
     for (int i=0; i<M; ++i) {
       markerI.push_back(i);
+    }
+    std::vector<int> fixedI;
+    for(int j=0; j<F; ++j){
+      fixedI.push_back(j);
     }
     VectorXd xsquared(M);
     double num;
@@ -170,6 +182,7 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
 
     //beta=(beta.array().abs() > 1e-6  ).select(beta, MatrixXd::Zero(M,1));
     beta.setZero();
+    alpha.setZero();
 
     //mu=norm_rng(0,1);
     mu=0;
@@ -179,6 +192,8 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
     // sigmaG=(1*cVa).sum()/M;
     for(int i=0; i<groups;i++)
       sigmaGG[i]=beta_rng(1,1);
+
+    sigmaF= (double)R::runif(0,1);
 
     pi=priorPi;
 
@@ -197,6 +212,16 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
         mu = norm_rng(epsilon.sum()/(double)N, sigmaE/(double)N); //update mu
         epsilon= epsilon.array()-mu;// we substract again now epsilon =Y-mu-X*beta
 
+        std::random_shuffle(fixedI.begin(), fixedI.end());
+        for(int cur_fix=0; cur_fix < F; cur_fix++){
+          int cur = fixedI[cur_fix];
+          auto cur_alpha = alpha[cur];
+          y_tilde= epsilon.array()+(fixed.col(cur)*cur_alpha).array();
+          auto denom_f = (N-1) + (sigmaE/sigmaF);
+          auto num_f = (fixed.col(cur).cwiseProduct(y_tilde)).sum();
+          alpha[cur] = norm_rng(num_f/denom_f,sigmaE/denom_f);
+          epsilon = y_tilde - fixed.col(cur)*alpha[cur];
+        }
 
         std::random_shuffle(markerI.begin(), markerI.end());
 
@@ -272,6 +297,8 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
         }
 
 
+        sigmaF = inv_scaled_chisq_rng(v0E+F,(alpha.squaredNorm()+v0E*s02E)/(v0E+F));
+        // Rcpp::Rcout << sigmaF;
 
         sigmaE=inv_scaled_chisq_rng(v0E+N,((epsilon).squaredNorm()+v0E*s02E)/(v0E+N));
 
@@ -286,14 +313,17 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
         if(iteration >= burn_in)
         {
           if(iteration % thinning == 0){
-            sample<< iteration,mu,beta,sigmaE,components,sigmaGG,epsilon;
+            sample<< iteration,mu,beta,sigmaE,components,sigmaGG,epsilon,alpha,sigmaF;
+
             q.enqueue(sample);
             //here we have the consumer
 #ifdef _OPENMP
 
 #else
-            if(q.try_dequeue(sampleq))
+            if(q.try_dequeue(sampleq)){
+
               outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
+            }
 #endif
           }
 
@@ -313,8 +343,9 @@ void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations,
 
 
       while(!flag ){
-        if(q.try_dequeue(sampleq))
+        if(q.try_dequeue(sampleq)){
           outFile<< sampleq.transpose().format(CommaInitFmt) << "\n";
+        }
       }//while
 
 

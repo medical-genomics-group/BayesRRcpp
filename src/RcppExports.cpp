@@ -6,52 +6,6 @@
 
 using namespace Rcpp;
 
-// BayesRSamplerV2
-void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double sigma0, double v0E, double s02E, double v0G, double s02G, Eigen::VectorXd cva);
-RcppExport SEXP _BayesRRcpp_BayesRSamplerV2(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP sigma0SEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP v0GSEXP, SEXP s02GSEXP, SEXP cvaSEXP) {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
-    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
-    Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
-    Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
-    Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
-    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
-    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma0(sigma0SEXP);
-    Rcpp::traits::input_parameter< double >::type v0E(v0ESEXP);
-    Rcpp::traits::input_parameter< double >::type s02E(s02ESEXP);
-    Rcpp::traits::input_parameter< double >::type v0G(v0GSEXP);
-    Rcpp::traits::input_parameter< double >::type s02G(s02GSEXP);
-    Rcpp::traits::input_parameter< Eigen::VectorXd >::type cva(cvaSEXP);
-    BayesRSamplerV2(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva);
-    return R_NilValue;
-END_RCPP
-}
-// BayesRSamplerV2Groups
-void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double sigma0, double v0E, double s02E, double v0G, double s02G, Eigen::MatrixXd cva, int groups, Eigen::VectorXi gAssign);
-RcppExport SEXP _BayesRRcpp_BayesRSamplerV2Groups(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP sigma0SEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP v0GSEXP, SEXP s02GSEXP, SEXP cvaSEXP, SEXP groupsSEXP, SEXP gAssignSEXP) {
-BEGIN_RCPP
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
-    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
-    Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
-    Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
-    Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
-    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
-    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< double >::type sigma0(sigma0SEXP);
-    Rcpp::traits::input_parameter< double >::type v0E(v0ESEXP);
-    Rcpp::traits::input_parameter< double >::type s02E(s02ESEXP);
-    Rcpp::traits::input_parameter< double >::type v0G(v0GSEXP);
-    Rcpp::traits::input_parameter< double >::type s02G(s02GSEXP);
-    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type cva(cvaSEXP);
-    Rcpp::traits::input_parameter< int >::type groups(groupsSEXP);
-    Rcpp::traits::input_parameter< Eigen::VectorXi >::type gAssign(gAssignSEXP);
-    BayesRSamplerV2Groups(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva, groups, gAssign);
-    return R_NilValue;
-END_RCPP
-}
 // BRV2Grstart
 void BRV2Grstart(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, double mu, Eigen::MatrixXd beta, double sigmaE, Eigen::VectorXd sigmaGG, Eigen::MatrixXd X, Eigen::VectorXd epsilon, Eigen::VectorXd components, double sigma0, double v0E, double s02E, double v0G, double s02G, Eigen::MatrixXd cva, int groups, Eigen::VectorXi gAssign);
 RcppExport SEXP _BayesRRcpp_BRV2Grstart(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP muSEXP, SEXP betaSEXP, SEXP sigmaESEXP, SEXP sigmaGGSEXP, SEXP XSEXP, SEXP epsilonSEXP, SEXP componentsSEXP, SEXP sigma0SEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP v0GSEXP, SEXP s02GSEXP, SEXP cvaSEXP, SEXP groupsSEXP, SEXP gAssignSEXP) {
@@ -81,11 +35,83 @@ BEGIN_RCPP
     return R_NilValue;
 END_RCPP
 }
+// BayesRSamplerV2
+void BayesRSamplerV2(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double sigma0, double v0E, double s02E, double v0G, double s02G, Eigen::VectorXd cva);
+RcppExport SEXP _BayesRRcpp_BayesRSamplerV2(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP sigma0SEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP v0GSEXP, SEXP s02GSEXP, SEXP cvaSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
+    Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
+    Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma0(sigma0SEXP);
+    Rcpp::traits::input_parameter< double >::type v0E(v0ESEXP);
+    Rcpp::traits::input_parameter< double >::type s02E(s02ESEXP);
+    Rcpp::traits::input_parameter< double >::type v0G(v0GSEXP);
+    Rcpp::traits::input_parameter< double >::type s02G(s02GSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type cva(cvaSEXP);
+    BayesRSamplerV2(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva);
+    return R_NilValue;
+END_RCPP
+}
+// BayesRSamplerV2Groups
+void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double sigma0, double v0E, double s02E, double v0G, double s02G, Eigen::MatrixXd cva, int groups, Eigen::VectorXi gAssign, Eigen::MatrixXd fixed);
+RcppExport SEXP _BayesRRcpp_BayesRSamplerV2Groups(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP sigma0SEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP v0GSEXP, SEXP s02GSEXP, SEXP cvaSEXP, SEXP groupsSEXP, SEXP gAssignSEXP, SEXP fixedSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
+    Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
+    Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< double >::type sigma0(sigma0SEXP);
+    Rcpp::traits::input_parameter< double >::type v0E(v0ESEXP);
+    Rcpp::traits::input_parameter< double >::type s02E(s02ESEXP);
+    Rcpp::traits::input_parameter< double >::type v0G(v0GSEXP);
+    Rcpp::traits::input_parameter< double >::type s02G(s02GSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type cva(cvaSEXP);
+    Rcpp::traits::input_parameter< int >::type groups(groupsSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXi >::type gAssign(gAssignSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type fixed(fixedSEXP);
+    BayesRSamplerV2Groups(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva, groups, gAssign, fixed);
+    return R_NilValue;
+END_RCPP
+}
+// HorseshoeR
+void HorseshoeR(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y, double A, double v0E, double s02E, double vL, double vT, double c2, double vC, double sC);
+RcppExport SEXP _BayesRRcpp_HorseshoeR(SEXP outputFileSEXP, SEXP seedSEXP, SEXP max_iterationsSEXP, SEXP burn_inSEXP, SEXP thinningSEXP, SEXP XSEXP, SEXP YSEXP, SEXP ASEXP, SEXP v0ESEXP, SEXP s02ESEXP, SEXP vLSEXP, SEXP vTSEXP, SEXP c2SEXP, SEXP vCSEXP, SEXP sCSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< std::string >::type outputFile(outputFileSEXP);
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type max_iterations(max_iterationsSEXP);
+    Rcpp::traits::input_parameter< int >::type burn_in(burn_inSEXP);
+    Rcpp::traits::input_parameter< int >::type thinning(thinningSEXP);
+    Rcpp::traits::input_parameter< Eigen::MatrixXd >::type X(XSEXP);
+    Rcpp::traits::input_parameter< Eigen::VectorXd >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< double >::type A(ASEXP);
+    Rcpp::traits::input_parameter< double >::type v0E(v0ESEXP);
+    Rcpp::traits::input_parameter< double >::type s02E(s02ESEXP);
+    Rcpp::traits::input_parameter< double >::type vL(vLSEXP);
+    Rcpp::traits::input_parameter< double >::type vT(vTSEXP);
+    Rcpp::traits::input_parameter< double >::type c2(c2SEXP);
+    Rcpp::traits::input_parameter< double >::type vC(vCSEXP);
+    Rcpp::traits::input_parameter< double >::type sC(sCSEXP);
+    HorseshoeR(outputFile, seed, max_iterations, burn_in, thinning, X, Y, A, v0E, s02E, vL, vT, c2, vC, sC);
+    return R_NilValue;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_BayesRRcpp_BayesRSamplerV2", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2, 13},
-    {"_BayesRRcpp_BayesRSamplerV2Groups", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2Groups, 15},
     {"_BayesRRcpp_BRV2Grstart", (DL_FUNC) &_BayesRRcpp_BRV2Grstart, 20},
+    {"_BayesRRcpp_BayesRSamplerV2", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2, 13},
+    {"_BayesRRcpp_BayesRSamplerV2Groups", (DL_FUNC) &_BayesRRcpp_BayesRSamplerV2Groups, 16},
+    {"_BayesRRcpp_HorseshoeR", (DL_FUNC) &_BayesRRcpp_HorseshoeR, 15},
     {NULL, NULL, 0}
 };
 

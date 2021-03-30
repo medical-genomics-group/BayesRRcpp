@@ -38,38 +38,11 @@ N = 5000
 M = 1000
 X <- matrix(rbinom(n=MT*N, 2, .5), ncol=MT)
 X1<-X
-X[X == 2] <- "GG"
-X[X == 1] <- "AG"
-X[X == 0] <- "AA"
 b <- c(rnorm(M,0,sqrt(0.4/M)),rep(0,(MT-M))) # M non-zero effects
 g <- scale(X1) %*% b;  
 e <- rnorm(N,0, sqrt(0.6)) #residuals variance
 y = g + e  #we simulate phenotype
-ped <- data.frame(fid = 1:N, iid = 1:N, pid = rep(0,N), mid = rep(0,N), sex = rep(1,N), y = y, X)
-write.table(ped, paste("sim1.ped",sep=''), row.names=F, col.names=F, quote=F)
-map <- data.frame(chr = rep(1, MT), rs = paste("rs",1:MT,sep=''),  cm = rep(0,MT), bp = 1:MT)
-write.table(map, paste("sim1.map",sep=''), row.names=F, col.names=F, quote=F)
 
-```
-
-We are going to use plink to convert our simulated data into a bed file to exemplify a pipeline (assuming there is a plink installed in the system)
-```{r,cache=T}
-# use plink to convert to binary
-system("./plink --file ./sim1  --make-bed --out ./sim1")
-
-```
-
-We will simulate a phenotype again because plink may switch the allele ordering wen creating the BED file.
-
-```{r,cache=T}
-
-library(BEDMatrix)
-X1 <- BEDMatrix("sim1.bed") #We read the genotype matrix from the bed file, to ensure the allele ordering is the same
-X1 <- scale(X1) #we center and scale the genotype matrix
-b <- c(rnorm(M,0,sqrt(0.4/M)),rep(0,(MT-M))) # M non-zero effects
-g <- X1 %*% b;  
-e <- rnorm(N,0, sqrt(0.6)) #residuals variance
-y = g + e  #we simulate phenotype
 ```
 
 Now lets simulate a matrix of measurements coming from a methylation array data, lets assume that they have been QC'ed so that there is an exact correspondance with individuals in the genotype matrix. For 
@@ -82,6 +55,17 @@ b2 <- c(rnorm(M2,0,sqrt(0.5/M2)),rep(0,(M2T-M2)))
 m <- scale(X2) %*% b2; 
 e2 <- rnorm(N,0, sqrt(0.1))
 y2 <- g + m + e2
+```
+
+And finally let's simulate som fixed covariates
+
+```{r}
+F = 10
+X3 <- matrix(rnorm(n=F*N),ncol=F)
+b3 <- rnorm(F,0,sqrt(0.05/F))
+f <- scale(X3) %*% b3
+e3 <- rnorm(N, 0 , sqrt(0.05))
+y3 <- g + m + f + e3
 ```
 
 
@@ -104,8 +88,6 @@ We load the Bed file using the
 Having the phenotype $y$ and the marker matrix $X1$ we aim to recover the true effects $b$
 
 ```{r,cache=T} 
-library(BEDMatrix) #for reading the BED file into a matrix
-X <- BEDMatrix("sim1.bed") 
 library(BayesRRcpp)
 Y<-scale(y) #we center and scale to std=1 to interpret results in scale of sd
 XX <- scale(X) #we center and scale the columns of X
@@ -116,7 +98,7 @@ v0G = 0.0001 #degrees of freedom of the inv bla bla prior over snp effects
 s02G = 0.001 # scale for the samecva 
 cva=as.matrix(c(0.0001,0.001,0.01)) #components variance
 markers.ID<-colnames(XX) #we strongly recommend to save the marker ID before running BayesR
-BayesRSamplerV2("./sim1.csv",2, 20000, 15000,5,XX, Y,sigma0,v0E,s02E,v0G,s02G,cva)
+BayesRSamplerV2("./sim1.csv",2, 2000, 1500,5,XX, Y,sigma0,v0E,s02E,v0G,s02G,cva)
 ```
 
 The output file *sim1.csv* is a text file with comma separated fields, the first line contains the variables names, which are:
@@ -146,16 +128,6 @@ We can normalize the variance to the total amount of variance in the model to ge
 print(summary(varG/(varE+varG)))
 ```
 
-We can also plot get summaries and statistics over the inferred effects, for example lets plot the posterior mean of the inferrer effects against the true values
-
-```{r,cache=T}
-true_effects<-b
-inferred_effects<-colMeans(as.matrix(C)[,grep("beta",colnames(C))]) #we look for all the effects in the posterior chain and get the mean over samples
-names(inferred_effects)<-markers.ID #we associate the previously saved markers ID to recover the names of the markers.
-
-plot(true_effects,inferred_effects)
-
-```
 
 
 # BayesRR: BayesR for different groups of variables
@@ -191,7 +163,8 @@ cva=matrix(c(c(0.00001,0.0001,0.001,0.01),c(0.00001,0.0001,0.001,0.01)),nrow=2,b
 G= 2 #number of groups
 GroupAssignment= c(rep(0,MT),rep(1,M2T)) #group 0 is for genetic markers in this case and group 1 is for methylation markers, age and sex
 
-BayesRSamplerV2Groups("./simGroups.csv",2, 20000, 15000,5,X, Y,sigma0,v0E,s02E,v0G,s02G,cva,G,GroupAssignment)
+
+BayesRSamplerV2Groups("./simGroups.csv",2, 2000, 1500,5,X, Y,sigma0,v0E,s02E,v0G,s02G,cva,G,GroupAssignment, matrix(data=rep(0,N),ncol = 1))
 ```
 
 
@@ -221,6 +194,54 @@ print(summary(varG/(varG+varG2+varE)))
 print(summary(varG2/(varG+varG2+varE)))
 ```
 
+## Fixed effects
 
+Now let's do the same for fixed effects
+```{r}
+# run our version
+Y <- scale(y3)
+X <- cbind(scale(XX),scale(X2))
+P=0.5 #prior probability of a marker being excluded from the model
+sigma0=0.01# prior  variance of a zero mean gaussian prior over the mean mu NOT IMPLEMENTED
+v0E= 0.0001 # degrees of freedom over the inv scaled chi square prior over residuals variance
+s02E = 0.001 #scale of the inv scaled chi square prior over residuals variance
+v0G = 0.0001 #degrees of freedom of the inv bla bla prior over snp effects
+s02G = 0.001 # scale for the samecva 
+cva=matrix(c(c(0.00001,0.0001,0.001,0.01),c(0.00001,0.0001,0.001,0.01)),nrow=2,byrow = T) #components variance prior scales
+
+G= 2 #number of groups
+GroupAssignment= c(rep(0,MT),rep(1,M2T)) #group 0 is for genetic markers in this case and group 1 is for methylation markers, age and sex
+
+BayesRSamplerV2Groups("./simFixed.csv",2, 2000, 1500,5,X, Y,sigma0,v0E,s02E,v0G,s02G,cva,G,GroupAssignment, X3)
+```
+
+
+
+```{r}
+library(data.table) # to read the csv file
+C<-fread("./simFixed.csv")
+varE<-C$sigmaE #residuals variance
+print(summary(varE))
+
+varG<-C$`sigmaG[2]`
+#methylation markers variance
+print(summary(varG))
+
+varG2<-C$`sigmaG[1]`
+#genetic markers variance
+print(summary(varG2))
+
+varF <- C$`sigmaF`
+print(summary(varF))
+```
+
+We can compute the proportion of variance explained by genetic and methylation markers
+```{r}
+#PVE by methylation markers
+print(summary(varG/(varG+varG2+varE)))
+
+#PVE by genetic markers
+print(summary(varG2/(varG+varG2+varE)))
+```
 
 # References
