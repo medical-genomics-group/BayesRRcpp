@@ -70,6 +70,7 @@ inline void initialize_file( std::ofstream& outFile,int M,int N,int groups, int 
 //' @param cva Matrix of mixture variances for groups, rows must be the same as number of groups, columns the same as number of mixtures.
 //' @param groups number of groups
 //' @param gAssign Vector of the same size as the number of columns of X, containing group assignments for each column(starting with group 0).
+//' @param fixed Matrxi with same rows as X and Y , contains the fixed effects, those whose prior is always different than zero
 // [[Rcpp::export]]
 void BayesRSamplerV2Groups(std::string outputFile, int seed, int max_iterations, int burn_in, int thinning, Eigen::MatrixXd X, Eigen::VectorXd Y,double sigma0, double v0E, double s02E, double v0G, double s02G,Eigen::MatrixXd cva,int groups, Eigen::VectorXi gAssign, Eigen::MatrixXd fixed) {
   int flag;

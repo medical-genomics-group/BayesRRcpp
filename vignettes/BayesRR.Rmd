@@ -4,10 +4,9 @@ author: "Daniel Trejo Baños"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{BayesR and BayesRR}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
-bibliography: bibliography.bib
 ---
 
 ```{r setup, include = FALSE}
@@ -19,7 +18,7 @@ knitr::opts_chunk$set(
 
 #  BayesR implementation
 
-The current package prototype is an implementation of BayesR [@erbe2012improving]. It was developed in C++ 11.0 with interface to R through Rcpp. For numeric and matrix computations the library Eigen3 was used, along with it's R interface:
+The current package prototype is an implementation of BayesR. It was developed in C++ 11.0 with interface to R through Rcpp. For numeric and matrix computations the library Eigen3 was used, along with it's R interface:
 
 - the random effects coefficients are sampled from four distributions in a mixture. the mixture variances are 0, 0.01, 0.001 and 0.0001 times the parameter $\sigma_{G}$. These variances can be adjusted through a vector cva.
 
@@ -144,7 +143,7 @@ over a trait $\mathbf{y}\in\mathbb{R}^{\mathrm{N}\times1}$ such that,
 
 where $\epsilon\sim\mathcal{N}\left(0,\sigma_{\epsilon}^{2}\mathbf{I}_{N}\right)$,
 the methylation matrix $\mathbf{X}_{M}$ and the genotype matrix $\mathbf{X}_{G}$
-have been centered and scaled to unit variance.
+have been centered and scaled to unit variance. We add a matrix full with zeros as fixed effects.
 
 
 
@@ -196,7 +195,7 @@ print(summary(varG2/(varG+varG2+varE)))
 
 ## Fixed effects
 
-Now let's do the same for fixed effects
+Now let's do the same for fixed effects, we pass a matrix full with those variables we asszme to always have an effect.
 ```{r}
 # run our version
 Y <- scale(y3)

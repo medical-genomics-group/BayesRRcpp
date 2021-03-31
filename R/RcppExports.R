@@ -66,6 +66,7 @@ BayesRSamplerV2 <- function(outputFile, seed, max_iterations, burn_in, thinning,
 #' @param cva Matrix of mixture variances for groups, rows must be the same as number of groups, columns the same as number of mixtures.
 #' @param groups number of groups
 #' @param gAssign Vector of the same size as the number of columns of X, containing group assignments for each column(starting with group 0).
+#' @param fixed Matrxi with same rows as X and Y , contains the fixed effects, those whose prior is always different than zero
 BayesRSamplerV2Groups <- function(outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva, groups, gAssign, fixed) {
     invisible(.Call('_BayesRRcpp_BayesRSamplerV2Groups', PACKAGE = 'BayesRRcpp', outputFile, seed, max_iterations, burn_in, thinning, X, Y, sigma0, v0E, s02E, v0G, s02G, cva, groups, gAssign, fixed))
 }
